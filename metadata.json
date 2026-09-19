@@ -1,0 +1,6 @@
+{
+  "name": "Sistema de Gestão de Pedidos",
+  "description": "Sistema de emissão e gestão de pedidos e orçamentos comerciais com cadastro instantâneo de clientes, transportadoras e produtos, IPI segregado e impressão no modelo padrão.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
