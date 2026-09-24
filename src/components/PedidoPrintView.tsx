@@ -151,8 +151,11 @@ export const PedidoPrintView: React.FC<PedidoPrintViewProps> = ({ pedido, onBack
   };
 
   const handleCopiarTexto = () => {
-    const texto = `*${pedido.tipo === 'ORCAMENTO' ? 'ORÇAMENTO' : 'PEDIDO DE VENDA'} - ${pedido.numero}*
-Empresa: ${pedido.empresaEmissora.nome}
+    const numIndustria = pedido.numeroPedidoIndustria;
+    const ocCliente = pedido.ordemCompraCliente || pedido.numeroPedidoCliente;
+    const situacao = pedido.situacaoComercial || 'Enviado';
+    const texto = `*${pedido.tipo === 'ORCAMENTO' ? 'ORÇAMENTO' : 'PEDIDO DE VENDA'} - ${pedido.numero}* (${situacao.toUpperCase()})
+${numIndustria ? `Nº Pedido da Indústria: ${numIndustria}\n` : ''}${ocCliente ? `Ordem de Compra do Cliente: ${ocCliente}\n` : ''}Empresa: ${pedido.empresaEmissora.nome}
 Cliente: ${pedido.cliente.razaoSocial} (CNPJ: ${pedido.cliente.cnpjCpf})
 Vendedor: ${pedido.vendedor.nome}
 Cond. Pagamento: ${pedido.condicaoPagamento}
@@ -181,12 +184,15 @@ ${pedido.observacoes || ''}`;
   };
 
   const handleEnviarWhatsapp = () => {
+    const numIndustria = pedido.numeroPedidoIndustria;
+    const ocCliente = pedido.ordemCompraCliente || pedido.numeroPedidoCliente;
+    const situacao = pedido.situacaoComercial || 'Enviado';
     const telefoneLimpo = (pedido.cliente.celular || pedido.cliente.telefone || '').replace(
       /\D/g,
       ''
     );
     const texto = encodeURIComponent(`Olá ${pedido.cliente.contato || pedido.cliente.razaoSocial}!
-Segue o espelho do ${pedido.tipo === 'ORCAMENTO' ? 'Orçamento' : 'Pedido de Venda'} *${pedido.numero}*:
+Segue o espelho do ${pedido.tipo === 'ORCAMENTO' ? 'Orçamento' : 'Pedido de Venda'} *${pedido.numero}* [${situacao.toUpperCase()}]${numIndustria ? `\n• Nº Indústria: ${numIndustria}` : ''}${ocCliente ? `\n• Ordem de Compra do Cliente: ${ocCliente}` : ''}:
 
 Empresa: ${pedido.empresaEmissora.nome}
 Vendedor: ${pedido.vendedor.nome}
@@ -344,9 +350,26 @@ Ficamos à disposição para qualquer esclarecimento!`);
           </div>
 
           {/* Quadro Número do Pedido (Exato como no PDF) */}
-          <div className="border border-black p-2 min-w-[170px] text-center">
+          <div className="border border-black p-2 min-w-[180px] text-center">
             <div className="text-[11px] font-bold">Número do Pedido:</div>
             <div className="text-sm font-bold font-mono tracking-tight mt-0.5">{pedido.numero}</div>
+            {pedido.numeroPedidoIndustria && (
+              <div className="text-[10px] text-slate-700 mt-1 font-mono border-t border-slate-300 pt-1">
+                <span className="font-bold">Nº Pedido Indústria:</span> {pedido.numeroPedidoIndustria}
+              </div>
+            )}
+            {(pedido.ordemCompraCliente || pedido.numeroPedidoCliente) && (
+              <div className="text-[10px] text-slate-700 mt-0.5 font-mono">
+                <span className="font-bold">Ordem de Compra:</span> {pedido.ordemCompraCliente || pedido.numeroPedidoCliente}
+              </div>
+            )}
+            <div className="text-[10px] text-slate-700 mt-1 font-bold">
+              <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] ${
+                pedido.situacaoComercial === 'Fechado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {pedido.situacaoComercial === 'Fechado' ? 'PEDIDO FECHADO' : 'PEDIDO ENVIADO'}
+              </span>
+            </div>
             <div className="text-[10px] text-slate-600 mt-1">Cadastrado em:</div>
             <div className="text-[10px] font-mono">{formatDateTimeBR(pedido.dataCadastro)}</div>
           </div>
@@ -425,11 +448,15 @@ Ficamos à disposição para qualquer esclarecimento!`);
         {/* INFORMAÇÕES DE FATURAMENTO / PAGAMENTO / PRAZO */}
         <div className="text-[11px] leading-snug space-y-1 py-1">
           <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-6">
-              <span className="font-bold">Nº Pedido Cliente:</span>{' '}
-              {pedido.numeroPedidoCliente || '-'}
+            <div className="col-span-4">
+              <span className="font-bold">Nº Pedido Indústria:</span>{' '}
+              {pedido.numeroPedidoIndustria || '-'}
             </div>
-            <div className="col-span-6 text-right">
+            <div className="col-span-4 text-center">
+              <span className="font-bold">Ordem de Compra:</span>{' '}
+              {pedido.ordemCompraCliente || pedido.numeroPedidoCliente || '-'}
+            </div>
+            <div className="col-span-4 text-right">
               <span className="font-bold">Data Prevista:</span> {formatDateBR(pedido.dataPrevista)}
             </div>
           </div>

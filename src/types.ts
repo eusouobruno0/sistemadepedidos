@@ -51,6 +51,7 @@ export interface Produto {
 export interface Representada {
   id: string;
   nome: string;
+  razaoSocial?: string;
   cnpj: string;
   ie: string;
   telefone: string;
@@ -99,16 +100,21 @@ export interface ItemPedido {
 }
 
 export type TipoDocumento = 'ORCAMENTO' | 'PEDIDO';
-export type StatusPedido = 'Rascunho' | 'Aprovado' | 'Pendente' | 'Faturado' | 'Cancelado';
+export type StatusPedido = 'Rascunho' | 'Emitido' | 'Cancelado' | 'Aprovado' | 'Pendente' | 'Faturado';
+export type SituacaoComercial = 'Enviado' | 'Fechado';
 
 export interface Pedido {
-  id: string;
-  numero: string; // Ex: ORC00031089 ou PED00031090
+  id: string; // UUID técnico único
+  numeroSequencial?: number; // Sequencial comercial interno gerado pelo sistema (1, 2, 3...)
+  numero: string; // Exibição formatada do número do pedido do sistema: PED000001 (ou Rascunho)
   tipo: TipoDocumento;
   status: StatusPedido;
+  situacaoComercial: SituacaoComercial; // 'Enviado' | 'Fechado'
   dataCadastro: string; // ISO string
   dataPrevista: string; // YYYY-MM-DD
-  numeroPedidoCliente?: string; // Ex: 79462
+  numeroPedidoIndustria?: string; // Número fornecido pela indústria (preenchido manualmente pelo usuário)
+  ordemCompraCliente?: string; // Ordem de Compra do Cliente (preenchimento manual independente)
+  numeroPedidoCliente?: string; // Mantido para compatibilidade retroativa
   
   empresaEmissora: Representada;
   cliente: Cliente;
@@ -144,4 +150,5 @@ export interface RelatorioFiltros {
   representadaId?: string;
   condicaoPagamento?: string;
   tipoFrete?: 'FOB' | 'CIF' | 'TODOS';
+  situacaoComercial?: 'TODOS' | 'Enviado' | 'Fechado';
 }

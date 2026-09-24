@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, Check, Calculator, Building2, Layers } from 'lucide-react';
+import { X, Package, Check, Layers } from 'lucide-react';
 import { Produto, Representada } from '../../types';
-import { StorageService } from '../../utils/storage';
 import { formatCurrency } from '../../utils/formatters';
 
 interface ProdutoModalProps {
@@ -26,64 +25,50 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
   const [unidadeMedida, setUnidadeMedida] = useState<'CX' | 'UN' | 'MIL' | 'KG' | 'PC' | 'FD'>('CX');
   const [representadaId, setRepresentadaId] = useState<string>('');
 
-  // Modelagem Caixa e Unidade
-  const [quantidadePorCaixa, setQuantidadePorCaixa] = useState<number>(10000);
-  const [precoCaixa, setPrecoCaixa] = useState<number>(900);
+  // Modelagem Caixa e Unidade (Fonte única: precoMilheiro)
+  const [quantidadePorCaixa, setQuantidadePorCaixa] = useState<number>(1000);
+  const [precoCaixa, setPrecoCaixa] = useState<number>(90);
   const [precoUnidade, setPrecoUnidade] = useState<number>(0.09);
   const [precoMilheiro, setPrecoMilheiro] = useState<number>(90);
 
   // Impostos e peso
-  const [aliquotaIpi, setAliquotaIpi] = useState<number>(5.0);
-  const [pesoUnitarioKg, setPesoUnitarioKg] = useState<number>(15.0);
+  const [aliquotaIpi, setAliquotaIpi] = useState<number>(0);
+  const [pesoUnitarioKg, setPesoUnitarioKg] = useState<number>(0);
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        setCodigoInterno(initialData.codigoInterno || initialData.codigo || '');
+        setCodigoInterno(initialData.codigoInterno || '');
         setCodigoExterno(initialData.codigo || '');
         setDescricao(initialData.descricao || '');
         setReferencia(initialData.referencia || '');
         setUnidadeMedida(initialData.unidadeMedida || 'CX');
         setRepresentadaId(initialData.representadaId || representadas[0]?.id || '');
 
-        const qtdCx =
-          initialData.quantidadePorCaixa ||
-          (initialData.qtdMilheiroPorCaixa ? Math.round(initialData.qtdMilheiroPorCaixa * 1000) : 1);
+        const qtdCx = initialData.quantidadePorCaixa || 1000;
         setQuantidadePorCaixa(qtdCx);
 
-        const prCx =
-          initialData.precoCaixa ||
-          (initialData.unidadeMedida === 'CX' ? initialData.precoUnitario : initialData.precoUnitario * qtdCx);
-        setPrecoCaixa(prCx);
-
-        const prUn =
-          initialData.precoUnidade ||
-          (qtdCx > 0 ? Number((prCx / qtdCx).toFixed(4)) : initialData.precoUnitario);
-        setPrecoUnidade(prUn);
-
-        const prMil =
-          initialData.precoMilheiro ||
-          Number((prUn * 1000).toFixed(2));
+        const prMil = initialData.precoMilheiro || 0;
         setPrecoMilheiro(prMil);
+        setPrecoUnidade(Number((prMil / 1000).toFixed(4)));
+        setPrecoCaixa(Number(((prMil * qtdCx) / 1000).toFixed(2)));
 
-        setAliquotaIpi(initialData.aliquotaIpi ?? 0);
-        setPesoUnitarioKg(initialData.pesoUnitarioKg ?? 0);
+        setAliquotaIpi(initialData.aliquotaIpi || 0);
+        setPesoUnitarioKg(initialData.pesoUnitarioKg || 0);
       } else {
-        // Gera o próximo código interno sequencial sem colisão
-        const nextCod = StorageService.getNextCodigoProduto();
-        setCodigoInterno(nextCod);
+        setCodigoInterno('');
         setCodigoExterno('');
         setDescricao('');
         setReferencia('');
         setUnidadeMedida('CX');
         setRepresentadaId(representadas[0]?.id || '');
-        setQuantidadePorCaixa(10000);
-        setPrecoCaixa(900);
-        setPrecoUnidade(0.09);
+        setQuantidadePorCaixa(1000);
         setPrecoMilheiro(90);
-        setAliquotaIpi(5.0);
-        setPesoUnitarioKg(12.0);
+        setPrecoUnidade(0.09);
+        setPrecoCaixa(90);
+        setAliquotaIpi(0);
+        setPesoUnitarioKg(0);
       }
       setError('');
     }
@@ -91,8 +76,26 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Atualização bidirecional de preços e medidas:
-  // 1. Quando o usuário digita o Preço da Caixa
+  // 1. Quando o usuário altera o Preço do Milheiro (FONTE DE VERDADE)
+  const handlePrecoMilheiroChange = (valorMilheiro: number) => {
+    const mil = Math.max(0, valorMilheiro);
+    setPrecoMilheiro(mil);
+    const un = Number((mil / 1000).toFixed(4));
+    setPrecoUnidade(un);
+    const qtd = Math.max(1, quantidadePorCaixa || 1);
+    setPrecoCaixa(Number(((mil * qtd) / 1000).toFixed(2)));
+  };
+
+  // 2. Quando altera a Quantidade por Caixa
+  const handleQtdCaixaChange = (qtd: number) => {
+    const q = Math.max(1, qtd);
+    setQuantidadePorCaixa(q);
+    if (precoMilheiro > 0) {
+      setPrecoCaixa(Number(((precoMilheiro * q) / 1000).toFixed(2)));
+    }
+  };
+
+  // 3. Ajuste direto do Preço da Caixa
   const handlePrecoCaixaChange = (valorCx: number) => {
     const cx = Math.max(0, valorCx);
     setPrecoCaixa(cx);
@@ -102,37 +105,6 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
     setPrecoMilheiro(Number((un * 1000).toFixed(2)));
   };
 
-  // 2. Quando o usuário altera a Quantidade de Unidades na Caixa
-  const handleQtdCaixaChange = (qtdNova: number) => {
-    const qtd = Math.max(1, qtdNova);
-    setQuantidadePorCaixa(qtd);
-    if (precoCaixa > 0) {
-      const un = Number((precoCaixa / qtd).toFixed(4));
-      setPrecoUnidade(un);
-      setPrecoMilheiro(Number((un * 1000).toFixed(2)));
-    }
-  };
-
-  // 3. Quando o usuário altera o Preço por Unidade diretamente
-  const handlePrecoUnidadeChange = (valorUn: number) => {
-    const un = Math.max(0, valorUn);
-    setPrecoUnidade(un);
-    const qtd = Math.max(1, quantidadePorCaixa || 1);
-    const cx = Number((un * qtd).toFixed(2));
-    setPrecoCaixa(cx);
-    setPrecoMilheiro(Number((un * 1000).toFixed(2)));
-  };
-
-  // 4. Quando o usuário altera o Preço por Milheiro
-  const handlePrecoMilheiroChange = (valorMil: number) => {
-    const mil = Math.max(0, valorMil);
-    setPrecoMilheiro(mil);
-    const un = Number((mil / 1000).toFixed(4));
-    setPrecoUnidade(un);
-    const qtd = Math.max(1, quantidadePorCaixa || 1);
-    setPrecoCaixa(Number((un * qtd).toFixed(2)));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!descricao.trim()) {
@@ -140,24 +112,26 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
       return;
     }
 
-    const precoComercialPadrao = unidadeMedida === 'CX' ? precoCaixa : precoUnidade;
+    if (!representadaId) {
+      setError('Selecione a empresa representada do produto.');
+      return;
+    }
 
     const produtoSalvo: Produto = {
-      id: initialData?.id || `prod-${Date.now()}`,
-      codigoInterno,
-      codigo: codigoExterno.trim() || codigoInterno,
+      id: initialData?.id || '',
+      codigoInterno: initialData?.codigoInterno || '', // Gerado pelo banco (000001)
+      codigo: codigoExterno.trim() || initialData?.codigoInterno || 'PROD',
       descricao: descricao.toUpperCase().trim(),
       referencia: referencia.toUpperCase().trim(),
       unidadeMedida,
       quantidadePorCaixa: unidadeMedida === 'CX' ? quantidadePorCaixa : 1,
-      precoCaixa: unidadeMedida === 'CX' ? precoCaixa : precoComercialPadrao,
-      precoUnidade,
       precoMilheiro,
-      qtdMilheiroPorCaixa: quantidadePorCaixa / 1000,
-      precoUnitario: precoComercialPadrao,
+      precoCaixa,
+      precoUnidade,
+      precoUnitario: unidadeMedida === 'CX' ? precoCaixa : precoUnidade,
       aliquotaIpi: Number(aliquotaIpi) || 0,
       pesoUnitarioKg: Number(pesoUnitarioKg) || 0,
-      representadaId: representadaId || representadas[0]?.id || '',
+      representadaId,
     };
 
     onSave(produtoSalvo);
@@ -176,7 +150,6 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
         id="modal-produto-container"
         className="relative bg-white rounded-2xl shadow-2xl border-2 border-slate-300 w-full max-w-2xl overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-200"
       >
-        {/* Cabeçalho do Modal */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 bg-slate-50">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-indigo-700 text-white flex items-center justify-center font-bold shadow-xs">
@@ -187,114 +160,37 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
                 {initialData ? 'Editar Produto' : 'Cadastrar Novo Produto'}
               </h2>
               <p className="text-sm text-slate-600 font-medium">
-                Código sequencial automático e conversão de caixa / unidade
+                {initialData?.codigoInterno ? `Código interno ${initialData.codigoInterno}` : 'Código gerado automaticamente pelo banco'}
               </p>
             </div>
           </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-800 hover:bg-slate-200 p-2.5 rounded-xl transition-colors cursor-pointer"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
         {error && (
-          <div className="mx-6 mt-4 p-4 rounded-xl bg-red-50 text-red-800 font-semibold text-base border-2 border-red-300">
+          <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm font-semibold">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* IDENTIFICADORES DO PRODUTO */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-            {/* CÓDIGO INTERNO (GERADO AUTOMATICAMENTE - NÃO EDITÁVEL) */}
-            <div className="sm:col-span-4">
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                Cód. Interno (Sistema)
-              </label>
-              <div className="h-12 px-4 bg-indigo-50 border-2 border-indigo-200 rounded-xl flex items-center justify-between">
-                <span className="font-mono font-black text-lg text-indigo-800">
-                  {codigoInterno}
-                </span>
-                <span className="text-xs font-bold px-2 py-0.5 bg-indigo-200 text-indigo-900 rounded-md">
-                  Automático
-                </span>
-              </div>
-            </div>
-
-            {/* CÓDIGO EXTERNO / FÁBRICA / COMERCIAL */}
-            <div className="sm:col-span-8">
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                Cód. Comercial / Fábrica / Referência Externa
-              </label>
-              <input
-                type="text"
-                value={codigoExterno}
-                onChange={(e) => setCodigoExterno(e.target.value)}
-                placeholder="Ex: 040112860 ou REF-88"
-                className="w-full h-12 px-4 text-base font-mono font-bold bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
-              />
-            </div>
-          </div>
-
-          {/* DESCRIÇÃO DO PRODUTO */}
-          <div>
-            <label className="block text-base font-bold text-slate-900 mb-1.5">
-              Descrição do Produto <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Ex: CUIA 1L ESPECIAL ou PA 28x60"
-              className="w-full h-12 px-4 text-base font-bold bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden uppercase"
-            />
-          </div>
-
-          {/* REFERÊNCIA, UNIDADE E REPRESENTADA */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                Referência / Modelo
-              </label>
-              <input
-                type="text"
-                value={referencia}
-                onChange={(e) => setReferencia(e.target.value)}
-                placeholder="Ex: CX 10 MIL ou C A"
-                className="w-full h-12 px-4 text-base bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden uppercase"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                Unidade de Venda
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Empresa Representada *
               </label>
               <select
-                value={unidadeMedida}
-                onChange={(e) => setUnidadeMedida(e.target.value as any)}
-                className="w-full h-12 px-4 text-base font-bold bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
-              >
-                <option value="CX">CX — Caixa</option>
-                <option value="UN">UN — Unidade</option>
-                <option value="MIL">MIL — Milheiro</option>
-                <option value="KG">KG — Quilo</option>
-                <option value="PC">PC — Peça</option>
-                <option value="FD">FD — Fardo</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                Representada / Fornecedor
-              </label>
-              <select
+                required
                 value={representadaId}
                 onChange={(e) => setRepresentadaId(e.target.value)}
-                className="w-full h-12 px-4 text-base font-semibold bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden text-ellipsis"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900"
               >
                 {representadas.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -303,142 +199,176 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
                 ))}
               </select>
             </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Código de Fábrica / Referência Externa
+              </label>
+              <input
+                type="text"
+                value={codigoExterno}
+                onChange={(e) => setCodigoExterno(e.target.value)}
+                placeholder="Ex: CAT-1020"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 font-medium text-slate-900"
+              />
+            </div>
           </div>
 
-          {/* SEÇÃO ESPECIAL: EMBALAGEM, CAIXA E PREÇOS EQUIVALENTES */}
-          <div className="p-5 bg-slate-50 border-2 border-indigo-200 rounded-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-indigo-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-indigo-700" />
-                <h3 className="text-base font-bold text-slate-900">
-                  Valores de Caixa e Unidade (Cálculo Automático)
-                </h3>
-              </div>
-              <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-3 py-1 rounded-full">
-                Derivação em tempo real
-              </span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Descrição do Produto *
+              </label>
+              <input
+                type="text"
+                required
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                placeholder="Ex: PARAFUSO AUTO BROCANTE 4,2 X 19"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 uppercase"
+              />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Referência / Medida
+              </label>
+              <input
+                type="text"
+                value={referencia}
+                onChange={(e) => setReferencia(e.target.value)}
+                placeholder="Ex: 4,2x19"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 font-medium text-slate-900 uppercase"
+              />
+            </div>
+          </div>
+
+          {/* Precificação: Fonte é o milheiro */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+            <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm">
+              <Layers className="w-4 h-4" />
+              <span>Precificação Comercial (Fonte: Preço do Milheiro)</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                  Quantidade de Unidades na Caixa
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Unidade de Medida
+                </label>
+                <select
+                  value={unidadeMedida}
+                  onChange={(e) => setUnidadeMedida(e.target.value as any)}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900"
+                >
+                  <option value="CX">CX (Caixa)</option>
+                  <option value="UN">UN (Unidade)</option>
+                  <option value="MIL">MIL (Milheiro)</option>
+                  <option value="KG">KG (Quilograma)</option>
+                  <option value="PC">PC (Pacote)</option>
+                  <option value="FD">FD (Fardo)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Qtd por Caixa (unidades)
                 </label>
                 <input
                   type="number"
                   min="1"
                   value={quantidadePorCaixa}
-                  onChange={(e) => handleQtdCaixaChange(parseFloat(e.target.value) || 1)}
-                  placeholder="Ex: 10000"
-                  className="w-full h-12 px-4 text-base font-bold font-mono bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
+                  onChange={(e) => handleQtdCaixaChange(Number(e.target.value))}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900"
                 />
-                <span className="text-xs font-semibold text-slate-500 mt-1 block">
-                  Ex: 1 caixa contém {quantidadePorCaixa.toLocaleString('pt-BR')} unidades
-                </span>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                  Preço da Caixa (R$) <span className="text-red-600">*</span>
+                <label className="block text-xs font-bold text-indigo-900 uppercase tracking-wider mb-1">
+                  Preço do Milheiro (R$) *
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   required
-                  value={precoCaixa}
-                  onChange={(e) => handlePrecoCaixaChange(parseFloat(e.target.value) || 0)}
-                  placeholder="Ex: 900.00"
-                  className="w-full h-12 px-4 text-lg font-black font-mono text-indigo-900 bg-white border-2 border-indigo-400 rounded-xl focus:border-indigo-700 outline-hidden"
+                  value={precoMilheiro}
+                  onChange={(e) => handlePrecoMilheiroChange(Number(e.target.value))}
+                  className="w-full px-4 py-2.5 bg-indigo-50 border-2 border-indigo-400 rounded-xl font-black text-indigo-900 text-lg"
                 />
-                <span className="text-xs font-semibold text-slate-500 mt-1 block">
-                  Valor comercial cobrado pela caixa
-                </span>
               </div>
             </div>
 
-            {/* PAINEL DE CONFERÊNCIA IMEDIATA DO DOUGLAS (SEM CALCULADORA) */}
-            <div className="bg-white border-2 border-slate-300 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="border-r-0 sm:border-r border-slate-200 pr-0 sm:pr-4">
-                <span className="text-xs font-bold text-slate-500 uppercase block">
-                  PREÇO POR UNIDADE
-                </span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-black text-slate-900 font-mono">
-                    R$ {precoUnidade.toFixed(4)}
-                  </span>
-                  <span className="text-xs font-bold text-slate-500">/ unidade</span>
-                </div>
-                <span className="text-xs text-slate-500 block mt-1">
-                  (R$ {precoCaixa.toFixed(2)} ÷ {quantidadePorCaixa.toLocaleString('pt-BR')} un.)
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-200 text-xs">
+              <div>
+                <span className="text-slate-500 font-semibold block">Preço derivado da unidade:</span>
+                <span className="text-base font-bold text-slate-800">
+                  {formatCurrency(precoUnidade, 4)} / unidade
                 </span>
               </div>
-
-              <div className="pl-0 sm:pl-2">
-                <span className="text-xs font-bold text-slate-500 uppercase block">
-                  PREÇO POR 1.000 (MILHEIRO)
-                </span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-black text-indigo-700 font-mono">
-                    R$ {precoMilheiro.toFixed(2)}
-                  </span>
-                  <span className="text-xs font-bold text-slate-500">/ milheiro</span>
+              <div>
+                <span className="text-slate-500 font-semibold block">Preço da caixa cheia:</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={precoCaixa}
+                    onChange={(e) => handlePrecoCaixaChange(Number(e.target.value))}
+                    className="w-32 px-2.5 py-1 text-sm bg-white border border-slate-300 rounded-lg font-bold text-slate-900"
+                  />
+                  <span className="text-xs text-slate-500 font-medium">({quantidadePorCaixa} un)</span>
                 </div>
-                <span className="text-xs text-slate-500 block mt-1">
-                  (R$ {precoUnidade.toFixed(4)} × 1.000)
-                </span>
               </div>
             </div>
           </div>
 
-          {/* IPI E PESO */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                Alíquota IPI (%) <span className="text-xs text-slate-500 font-normal">(Segregado)</span>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Alíquota de IPI (%)
               </label>
               <input
                 type="number"
-                step="0.01"
+                step="0.1"
                 min="0"
+                max="100"
                 value={aliquotaIpi}
-                onChange={(e) => setAliquotaIpi(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setAliquotaIpi(Number(e.target.value))}
                 placeholder="Ex: 5.0"
-                className="w-full h-12 px-4 text-base font-bold font-mono bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                Peso Unitário em Kg <span className="text-xs text-slate-500 font-normal">(por caixa ou unidade)</span>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Peso Unitário Estimado (kg)
               </label>
               <input
                 type="number"
                 step="0.001"
                 min="0"
                 value={pesoUnitarioKg}
-                onChange={(e) => setPesoUnitarioKg(parseFloat(e.target.value) || 0)}
-                placeholder="Ex: 15.000"
-                className="w-full h-12 px-4 text-base font-bold font-mono bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
+                onChange={(e) => setPesoUnitarioKg(Number(e.target.value))}
+                placeholder="Ex: 12.500"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900"
               />
             </div>
           </div>
 
-          {/* BOTÕES DE AÇÃO */}
-          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-200">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-6 py-3 text-base font-bold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="w-full sm:w-auto px-8 py-3.5 bg-indigo-700 hover:bg-indigo-800 text-white text-base font-black rounded-xl shadow-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-colors shadow-md flex items-center gap-2 cursor-pointer"
             >
-              <Check className="w-5 h-5" />
-              <span>{initialData ? 'Atualizar Produto' : 'Salvar e Adicionar ao Pedido'}</span>
+              <Check className="w-4 h-4" />
+              <span>Salvar Produto</span>
             </button>
           </div>
         </form>

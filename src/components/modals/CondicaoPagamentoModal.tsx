@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CreditCard, Check } from 'lucide-react';
 import { CondicaoPagamento } from '../../types';
 
@@ -6,16 +6,29 @@ interface CondicaoPagamentoModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (cond: CondicaoPagamento) => void;
+  initialData?: CondicaoPagamento | null;
 }
 
 export const CondicaoPagamentoModal: React.FC<CondicaoPagamentoModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  initialData,
 }) => {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (initialData) {
+      setNome(initialData.nome || '');
+      setDescricao(initialData.descricao || '');
+    } else {
+      setNome('');
+      setDescricao('');
+    }
+    setError('');
+  }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
@@ -27,7 +40,7 @@ export const CondicaoPagamentoModal: React.FC<CondicaoPagamentoModalProps> = ({
     }
 
     const newCond: CondicaoPagamento = {
-      id: `cond-${Date.now()}`,
+      id: initialData?.id || '',
       nome: nome.toUpperCase().trim(),
       descricao: descricao.trim() || undefined,
     };
@@ -56,8 +69,12 @@ export const CondicaoPagamentoModal: React.FC<CondicaoPagamentoModalProps> = ({
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-800">Nova Condição de Pagamento</h2>
-              <p className="text-xs text-slate-500">Cadastre para usar agora e nos próximos pedidos</p>
+              <h2 className="text-lg font-bold text-slate-800">
+                {initialData ? 'Editar Condição de Pagamento' : 'Nova Condição de Pagamento'}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {initialData ? 'Altere as informações da condição selecionada' : 'Cadastre para usar agora e nos próximos pedidos'}
+              </p>
             </div>
           </div>
           <button

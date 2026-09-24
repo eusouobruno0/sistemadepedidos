@@ -7,6 +7,7 @@ import {
   CondicaoPagamento,
   Pedido,
 } from '../types';
+import { formatPedidoNumero } from './formatters';
 import {
   INITIAL_CLIENTES,
   INITIAL_TRANSPORTADORAS,
@@ -28,6 +29,7 @@ const KEYS = {
   EMPRESA_PADRAO: 'gestao_pedidos_empresa_padrao_v1',
   SEQ_CLIENTE: 'gestao_pedidos_seq_cliente_v1',
   SEQ_PRODUTO: 'gestao_pedidos_seq_produto_v1',
+  SEQ_PEDIDO: 'gestao_pedidos_seq_pedido_v1',
 };
 
 function getItem<T>(key: string, defaultValue: T): T {
@@ -50,7 +52,7 @@ function setItem<T>(key: string, value: T): void {
 }
 
 export const StorageService = {
-  // Geração atômica e segura do próximo Código Interno de Cliente (ex: 000621)
+  // Geração atômica e segura do próximo Código Interno de Cliente (ex: 000621 ou 000001)
   getNextCodigoCliente(): string {
     const clientes = this.getClientes();
     let maxSeq = getItem<number>(KEYS.SEQ_CLIENTE, 0);
@@ -64,12 +66,12 @@ export const StorageService = {
       }
     }
 
-    const nextSeq = Math.max(maxSeq, 620) + 1;
+    const nextSeq = maxSeq + 1;
     setItem(KEYS.SEQ_CLIENTE, nextSeq);
     return String(nextSeq).padStart(6, '0');
   },
 
-  // Geração atômica e segura do próximo Código Interno de Produto (ex: 000005)
+  // Geração atômica e segura do próximo Código Interno de Produto (ex: 000005 ou 000001)
   getNextCodigoProduto(): string {
     const produtos = this.getProdutos();
     let maxSeq = getItem<number>(KEYS.SEQ_PRODUTO, 0);
@@ -83,14 +85,14 @@ export const StorageService = {
       }
     }
 
-    const nextSeq = Math.max(maxSeq, 4) + 1;
+    const nextSeq = maxSeq + 1;
     setItem(KEYS.SEQ_PRODUTO, nextSeq);
     return String(nextSeq).padStart(6, '0');
   },
 
   getClientes(): Cliente[] {
     const data = getItem<Cliente[]>(KEYS.CLIENTES, INITIAL_CLIENTES);
-    const list = data && data.length > 0 ? data : INITIAL_CLIENTES;
+    const list = Array.isArray(data) ? data : INITIAL_CLIENTES;
 
     // Migração transparente: assegura que todo cliente tenha código formatado de 6 dígitos
     let alterou = false;
@@ -195,7 +197,7 @@ export const StorageService = {
 
   getTransportadoras(): Transportadora[] {
     const data = getItem<Transportadora[]>(KEYS.TRANSPORTADORAS, INITIAL_TRANSPORTADORAS);
-    return data && data.length > 0 ? data : INITIAL_TRANSPORTADORAS;
+    return Array.isArray(data) ? data : INITIAL_TRANSPORTADORAS;
   },
   saveTransportadoras(list: Transportadora[]) {
     setItem(KEYS.TRANSPORTADORAS, list);
@@ -209,7 +211,7 @@ export const StorageService = {
 
   getProdutos(): Produto[] {
     const data = getItem<Produto[]>(KEYS.PRODUTOS, INITIAL_PRODUTOS);
-    const list = data && data.length > 0 ? data : INITIAL_PRODUTOS;
+    const list = Array.isArray(data) ? data : INITIAL_PRODUTOS;
 
     // Migração transparente de produtos para garantir codigoInterno e modelagem caixa/unidade
     let alterou = false;
@@ -238,11 +240,18 @@ export const StorageService = {
         }
       }
 
+      let precoMilheiro = p.precoMilheiro;
       let precoCaixa = p.precoCaixa;
       let precoUnidade = p.precoUnidade;
-      let precoMilheiro = p.precoMilheiro;
 
-      if (p.unidadeMedida === 'CX') {
+      if (precoMilheiro && precoMilheiro > 0) {
+        precoUnidade = Number((precoMilheiro / 1000).toFixed(4));
+        const calcCaixa = Number(((precoMilheiro * quantidadePorCaixa) / 1000).toFixed(2));
+        if (p.unidadeMedida === 'CX' && (!precoCaixa || Math.abs(precoCaixa - calcCaixa) > 0.05)) {
+          precoCaixa = calcCaixa;
+          mod = true;
+        }
+      } else if (p.unidadeMedida === 'CX') {
         precoCaixa = precoCaixa || p.precoUnitario;
         if (!precoUnidade && quantidadePorCaixa > 0) {
           precoUnidade = Number((precoCaixa / quantidadePorCaixa).toFixed(4));
@@ -324,7 +333,7 @@ export const StorageService = {
 
   getRepresentadas(): Representada[] {
     const data = getItem<Representada[]>(KEYS.REPRESENTADAS, INITIAL_REPRESENTADAS);
-    return data && data.length > 0 ? data : INITIAL_REPRESENTADAS;
+    return Array.isArray(data) ? data : INITIAL_REPRESENTADAS;
   },
   saveRepresentadas(list: Representada[]) {
     setItem(KEYS.REPRESENTADAS, list);
@@ -338,7 +347,7 @@ export const StorageService = {
 
   getVendedores(): Representante[] {
     const data = getItem<Representante[]>(KEYS.VENDEDORES, INITIAL_VENDEDORES);
-    return data && data.length > 0 ? data : INITIAL_VENDEDORES;
+    return Array.isArray(data) ? data : INITIAL_VENDEDORES;
   },
   saveVendedores(list: Representante[]) {
     setItem(KEYS.VENDEDORES, list);
@@ -352,7 +361,7 @@ export const StorageService = {
 
   getCondicoes(): CondicaoPagamento[] {
     const data = getItem<CondicaoPagamento[]>(KEYS.CONDICOES, INITIAL_CONDICOES_PAGAMENTO);
-    return data && data.length > 0 ? data : INITIAL_CONDICOES_PAGAMENTO;
+    return Array.isArray(data) ? data : INITIAL_CONDICOES_PAGAMENTO;
   },
   saveCondicoes(list: CondicaoPagamento[]) {
     setItem(KEYS.CONDICOES, list);
@@ -366,7 +375,43 @@ export const StorageService = {
 
   getPedidos(): Pedido[] {
     const data = getItem<Pedido[]>(KEYS.PEDIDOS, INITIAL_PEDIDOS);
-    return data && data.length > 0 ? data : INITIAL_PEDIDOS;
+    const list = Array.isArray(data) ? data : INITIAL_PEDIDOS;
+
+    // Migração transparente de pedidos legados
+    let alterou = false;
+    const migrados = list.map((p) => {
+      let mod = false;
+      const copia = { ...p };
+
+      // Se possui número antigo ORC ou resíduos de 31089
+      if (copia.numero && (copia.numero.startsWith('ORC') || copia.numero.includes('31089'))) {
+        copia.numeroSequencial = 1;
+        copia.numero = 'PED000001';
+        mod = true;
+      }
+
+      // Migração de Ordem de Compra do Cliente (separado de Número da Indústria)
+      if (!copia.ordemCompraCliente && copia.numeroPedidoCliente) {
+        copia.ordemCompraCliente = copia.numeroPedidoCliente;
+        mod = true;
+      }
+
+      // Migração de Situação Comercial ('Enviado' ou 'Fechado')
+      if (!copia.situacaoComercial) {
+        copia.situacaoComercial = copia.status === 'Faturado' || copia.status === 'Aprovado' ? 'Fechado' : 'Enviado';
+        mod = true;
+      }
+
+      if (mod) alterou = true;
+      return copia;
+    });
+
+    if (alterou) {
+      setItem(KEYS.PEDIDOS, migrados);
+      return migrados;
+    }
+
+    return list;
   },
   savePedidos(list: Pedido[]) {
     setItem(KEYS.PEDIDOS, list);
@@ -374,6 +419,31 @@ export const StorageService = {
   savePedido(pedido: Pedido): Pedido[] {
     const list = this.getPedidos();
     const idx = list.findIndex((p) => p.id === pedido.id);
+
+    // Campos comerciais independentes
+    pedido.numeroPedidoIndustria = (pedido.numeroPedidoIndustria || '').trim();
+    pedido.ordemCompraCliente = (pedido.ordemCompraCliente || pedido.numeroPedidoCliente || '').trim();
+    pedido.numeroPedidoCliente = pedido.ordemCompraCliente; // Compatibilidade legada
+    
+    // Situação comercial padrão
+    if (!pedido.situacaoComercial) {
+      pedido.situacaoComercial = pedido.status === 'Faturado' || pedido.status === 'Aprovado' ? 'Fechado' : 'Enviado';
+    }
+
+    // Regra do Momento da Numeração:
+    // Se o pedido for Rascunho e ainda não possui número comercial consumido, não gasta o sequencial
+    if (pedido.status === 'Rascunho' && !pedido.numeroSequencial) {
+      pedido.numero = 'RASCUNHO';
+    } else if (pedido.status !== 'Rascunho' && (!pedido.numeroSequencial || pedido.numero === 'RASCUNHO')) {
+      // Pedido emitido/aprovado: consome o próximo número sequencial comercial (ex: PED000001)
+      const proximo = this.consumirProximoNumeroPedido();
+      pedido.numeroSequencial = proximo.numeroSequencial;
+      pedido.numero = proximo.numero;
+    } else if (pedido.numeroSequencial) {
+      // Mantém a formatação padronizada do sequencial
+      pedido.numero = formatPedidoNumero(pedido.numeroSequencial);
+    }
+
     let updated: Pedido[];
     if (idx >= 0) {
       updated = [...list];
@@ -383,6 +453,35 @@ export const StorageService = {
     }
     this.savePedidos(updated);
     return updated;
+  },
+
+  // Alterna rapidamente entre 'Enviado' e 'Fechado' (permitido mesmo com pedido Emitido)
+  toggleSituacaoComercial(id: string): Pedido[] {
+    const list = this.getPedidos();
+    const idx = list.findIndex((p) => p.id === id);
+    if (idx < 0) return list;
+
+    const atual = list[idx];
+    const novaSituacao = atual.situacaoComercial === 'Fechado' ? 'Enviado' : 'Fechado';
+    const atualizado: Pedido = { ...atual, situacaoComercial: novaSituacao };
+    
+    const novaLista = [...list];
+    novaLista[idx] = atualizado;
+    this.savePedidos(novaLista);
+    return novaLista;
+  },
+
+  updateSituacaoComercial(id: string, situacao: 'Enviado' | 'Fechado'): Pedido[] {
+    const list = this.getPedidos();
+    const idx = list.findIndex((p) => p.id === id);
+    if (idx < 0) return list;
+
+    const atual = list[idx];
+    const atualizado: Pedido = { ...atual, situacaoComercial: situacao };
+    const novaLista = [...list];
+    novaLista[idx] = atualizado;
+    this.savePedidos(novaLista);
+    return novaLista;
   },
   deletePedido(id: string): Pedido[] {
     const list = this.getPedidos();
@@ -399,24 +498,71 @@ export const StorageService = {
     setItem(KEYS.VENDEDORES, INITIAL_VENDEDORES);
     setItem(KEYS.CONDICOES, INITIAL_CONDICOES_PAGAMENTO);
     setItem(KEYS.PEDIDOS, INITIAL_PEDIDOS);
+    setItem(KEYS.SEQ_PEDIDO, 1);
   },
 
-  getNextNumero(tipo: 'ORCAMENTO' | 'PEDIDO'): string {
+  /**
+   * Obtém o próximo número sequencial inteiro do sistema sem consumi-lo (apenas preview).
+   * A sequência oficial começa em 1 (PED000001).
+   */
+  getProximoNumeroSequencialPreview(): number {
     const pedidos = this.getPedidos();
-    const prefix = tipo === 'ORCAMENTO' ? 'ORC' : 'PED';
-    const matching = pedidos
-      .map((p) => p.numero)
-      .filter((n) => n && n.startsWith(prefix));
-    
-    let maxSeq = 31089;
-    for (const num of matching) {
-      const digits = num.replace(/\D/g, '');
-      const val = parseInt(digits, 10);
-      if (!isNaN(val) && val > maxSeq) {
-        maxSeq = val;
+    let storedSeq = getItem<number>(KEYS.SEQ_PEDIDO, 0);
+
+    // Limpa resíduos de sequências antigas inválidas (ex: 31089)
+    if (storedSeq > 20000) {
+      storedSeq = 0;
+      setItem(KEYS.SEQ_PEDIDO, 0);
+    }
+
+    // Calcula o maior número sequencial legítimo já emitido entre os pedidos
+    let maxEmPedidos = 0;
+    for (const p of pedidos) {
+      if (p.numeroSequencial && p.numeroSequencial < 20000) {
+        if (p.numeroSequencial > maxEmPedidos) {
+          maxEmPedidos = p.numeroSequencial;
+        }
+      } else if (p.numero && p.numero.startsWith('PED')) {
+        const digits = parseInt(p.numero.replace(/\D/g, ''), 10);
+        if (!isNaN(digits) && digits < 20000 && digits > maxEmPedidos) {
+          maxEmPedidos = digits;
+        }
       }
     }
-    const nextSeq = maxSeq + 1;
-    return `${prefix}${String(nextSeq).padStart(8, '0')}`;
+
+    const currentMax = Math.max(storedSeq, maxEmPedidos);
+    return currentMax + 1;
+  },
+
+  /**
+   * Retorna a string formatada do próximo número de pedido (ex: "PED000001") sem consumi-lo.
+   */
+  getPreviewProximoNumeroPedido(): string {
+    const nextSeq = this.getProximoNumeroSequencialPreview();
+    return formatPedidoNumero(nextSeq);
+  },
+
+  /**
+   * Consome o próximo número sequencial oficial do pedido, gravando no armazenamento.
+   * NOTA PARA O SUPABASE / POSTGRESQL:
+   * Na migração para o Supabase, este sequencial comercial será gerado com segurança
+   * no banco de dados via SEQUENCE ou RPC atômica (ex: nextval('pedidos_numero_seq') ou trigger),
+   * garantindo unicidade mesmo com múltiplos representantes emitindo em paralelo.
+   */
+  consumirProximoNumeroPedido(): { numeroSequencial: number; numero: string } {
+    const nextSeq = this.getProximoNumeroSequencialPreview();
+    setItem(KEYS.SEQ_PEDIDO, nextSeq);
+    return {
+      numeroSequencial: nextSeq,
+      numero: formatPedidoNumero(nextSeq),
+    };
+  },
+
+  /**
+   * Mantido para compatibilidade com chamadas existentes no frontend.
+   * Retorna o preview do próximo pedido gerado pelo sistema (PED000001, etc.).
+   */
+  getNextNumero(_tipo?: 'ORCAMENTO' | 'PEDIDO'): string {
+    return this.getPreviewProximoNumeroPedido();
   },
 };

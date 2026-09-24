@@ -52,7 +52,7 @@ export const TransportadoraModal: React.FC<TransportadoraModalProps> = ({
     }
 
     const newTransp: Transportadora = {
-      id: initialData?.id || `transp-${Date.now()}`,
+      id: initialData?.id || '',
       nome: formData.nome.toUpperCase().trim(),
       cnpj: formatCnpjCpf(formData.cnpj),
       telefone: formatPhone(formData.telefone),

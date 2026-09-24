@@ -38,6 +38,7 @@ import {
   Pedido,
   TipoDocumento,
   StatusPedido,
+  SituacaoComercial,
 } from '../types';
 import {
   formatCnpjCpf,
@@ -49,9 +50,11 @@ import {
   validateCpfCnpj,
 } from '../utils/formatters';
 import { TransportadoraModal } from './modals/TransportadoraModal';
+import { RepresentadaModal } from './modals/RepresentadaModal';
+import { RepresentanteModal } from './modals/RepresentanteModal';
 import { ProdutoModal } from './modals/ProdutoModal';
 import { CondicaoPagamentoModal } from './modals/CondicaoPagamentoModal';
-import { StorageService } from '../utils/storage';
+import { isValidUUID } from '../lib/database';
 
 interface PedidoFormProps {
   pedidoParaEditar?: Pedido | null;
@@ -63,6 +66,8 @@ interface PedidoFormProps {
   condicoes: CondicaoPagamento[];
   onSaveCliente: (cliente: Cliente) => void;
   onSaveTransportadora: (transp: Transportadora) => void;
+  onSaveRepresentada?: (rep: Representada) => void;
+  onSaveVendedor?: (vend: Representante) => void;
   onSaveProduto: (prod: Produto) => void;
   onSaveCondicao: (cond: CondicaoPagamento) => void;
   onSavePedido: (pedido: Pedido, irParaVisualizacao?: boolean) => void;
@@ -80,6 +85,8 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
   condicoes,
   onSaveCliente,
   onSaveTransportadora,
+  onSaveRepresentada,
+  onSaveVendedor,
   onSaveProduto,
   onSaveCondicao,
   onSavePedido,
@@ -87,9 +94,9 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
   nextNumero,
 }) => {
   // Número e Tipo de Documento
-  const [tipo, setTipo] = useState<TipoDocumento>(pedidoParaEditar?.tipo || 'ORCAMENTO');
+  const [tipo, setTipo] = useState<TipoDocumento>(pedidoParaEditar?.tipo || 'PEDIDO');
   const [numero, setNumero] = useState<string>(
-    pedidoParaEditar?.numero || nextNumero('ORCAMENTO')
+    pedidoParaEditar?.numero || nextNumero('PEDIDO')
   );
 
   // =========================================================
@@ -125,12 +132,24 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
   // =========================================================
   // 2. ESTADO DOS DADOS DO PEDIDO
   // =========================================================
-  const [numeroClienteRef, setNumeroClienteRef] = useState<string>(
-    pedidoParaEditar?.numeroPedidoCliente || ''
+  const [numeroPedidoIndustria, setNumeroPedidoIndustria] = useState<string>(
+    pedidoParaEditar?.numeroPedidoIndustria || ''
+  );
+  const [ordemCompraCliente, setOrdemCompraCliente] = useState<string>(
+    pedidoParaEditar?.ordemCompraCliente || pedidoParaEditar?.numeroPedidoCliente || ''
+  );
+  const [situacaoComercial, setSituacaoComercial] = useState<SituacaoComercial>(
+    pedidoParaEditar?.situacaoComercial || 'Enviado'
   );
   const [previsaoEntrega, setPrevisaoEntrega] = useState<string>(
     pedidoParaEditar?.dataPrevista ||
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
+  const [representadaId, setRepresentadaId] = useState<string>(
+    pedidoParaEditar?.empresaEmissora?.id || representadas[0]?.id || ''
+  );
+  const [vendedorId, setVendedorId] = useState<string>(
+    pedidoParaEditar?.vendedor?.id || vendedores[0]?.id || ''
   );
   const [transportadoraId, setTransportadoraId] = useState<string>(
     pedidoParaEditar?.transportadora?.id || transportadoras[0]?.id || ''
@@ -169,17 +188,27 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
     // Item inicial vazio se for novo pedido
     const p = produtos[0];
     if (p) {
-      const qtdPorCaixa = p.quantidadePorCaixa || (p.qtdMilheiroPorCaixa ? Math.round(p.qtdMilheiroPorCaixa * 1000) : 1);
-      const prCaixa = p.precoCaixa || p.precoUnitario;
-      const prUnidade = p.precoUnidade || (qtdPorCaixa > 0 ? Number((prCaixa / qtdPorCaixa).toFixed(4)) : prCaixa);
-      const prMilheiro = p.precoMilheiro || Number((prUnidade * 1000).toFixed(2));
+      const qtdPorCaixa =
+        p.quantidadePorCaixa ||
+        (p.qtdMilheiroPorCaixa ? Math.round(p.qtdMilheiroPorCaixa * 1000) : 1000);
+      const prMilheiro =
+        p.precoMilheiro ||
+        (p.precoUnidade
+          ? Number((p.precoUnidade * 1000).toFixed(2))
+          : p.precoCaixa && qtdPorCaixa > 0
+          ? Number(((p.precoCaixa / qtdPorCaixa) * 1000).toFixed(2))
+          : 90);
+      const prUnidade = Number((prMilheiro / 1000).toFixed(4));
+      const prCaixa = Number(((prMilheiro * qtdPorCaixa) / 1000).toFixed(2));
       const ipi = p.aliquotaIpi || 0;
-      const valorItens = prCaixa;
+      const valorUnitarioEfetivo =
+        p.unidadeMedida === 'UN' ? prUnidade : p.unidadeMedida === 'MIL' ? prMilheiro : prCaixa;
+      const valorItens = valorUnitarioEfetivo;
       const valorIpi = Number(((valorItens * ipi) / 100).toFixed(2));
 
       return [
         {
-          id: `item-${Date.now()}-0`,
+          id: '',
           produtoId: p.id,
           codigo: p.codigo,
           codigoInterno: p.codigoInterno || '000001',
@@ -192,7 +221,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
           precoUnidade: prUnidade,
           precoMilheiro: prMilheiro,
           qtdMilheiro: qtdPorCaixa / 1000,
-          precoUnitario: prCaixa,
+          precoUnitario: valorUnitarioEfetivo,
           aliquotaIpi: ipi,
           valorItens,
           valorIpi,
@@ -205,6 +234,8 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
 
   // Modais auxiliares
   const [showTranspModal, setShowTranspModal] = useState<boolean>(false);
+  const [showRepresentadaModal, setShowRepresentadaModal] = useState<boolean>(false);
+  const [showRepresentanteModal, setShowRepresentanteModal] = useState<boolean>(false);
   const [showProdutoModal, setShowProdutoModal] = useState<boolean>(false);
   const [produtoModalInitialDesc, setProdutoModalInitialDesc] = useState<string>('');
   const [showCondicaoModal, setShowCondicaoModal] = useState<boolean>(false);
@@ -232,6 +263,37 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
       setClienteEstado(c.estado || 'RS');
     }
   }, [pedidoParaEditar]);
+
+  // Garante seleção do Representante Padrão do Supabase (ex: Douglas ou primeiro disponível)
+  useEffect(() => {
+    if (vendedores.length > 0) {
+      const vendedorAtualExiste = vendedores.some((v) => v.id === vendedorId);
+      if (!vendedorAtualExiste || !vendedorId || !isValidUUID(vendedorId)) {
+        const douglas = vendedores.find((v) => v.nome.toLowerCase().includes('douglas'));
+        setVendedorId(douglas ? douglas.id : vendedores[0].id);
+      }
+    }
+  }, [vendedores, vendedorId]);
+
+  // Garante seleção da Representada padrão
+  useEffect(() => {
+    if (representadas.length > 0) {
+      const repExiste = representadas.some((r) => r.id === representadaId);
+      if (!repExiste || !representadaId || !isValidUUID(representadaId)) {
+        setRepresentadaId(representadas[0].id);
+      }
+    }
+  }, [representadas, representadaId]);
+
+  // Garante seleção da Transportadora padrão
+  useEffect(() => {
+    if (transportadoras.length > 0) {
+      const transpExiste = transportadoras.some((t) => t.id === transportadoraId);
+      if (!transpExiste || !transportadoraId || !isValidUUID(transportadoraId)) {
+        setTransportadoraId(transportadoras[0].id);
+      }
+    }
+  }, [transportadoras, transportadoraId]);
 
   // Atualiza o local de entrega automaticamente se estiver em branco ao preencher endereço do cliente
   useEffect(() => {
@@ -332,7 +394,21 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
 
     setTimeout(() => {
       setIsSearchingCliente(false);
-      const encontrados = StorageService.searchClientes(termo);
+      const cleanTermo = termo.toLowerCase();
+      const cleanDigitsTermo = cleanDigits(termo);
+
+      const encontrados = clientes.filter((c) => {
+        const codSemZeros = (c.codigo || '').replace(/^0+/, '');
+        const qSemZeros = cleanTermo.replace(/^0+/, '');
+        if (c.codigo?.toLowerCase() === cleanTermo || (qSemZeros && codSemZeros === qSemZeros)) return true;
+        if (cleanDigitsTermo.length >= 3) {
+          const cleanDoc = (c.cnpjCpf || '').replace(/\D/g, '');
+          if (cleanDoc.includes(cleanDigitsTermo)) return true;
+        }
+        if (c.razaoSocial?.toLowerCase().includes(cleanTermo)) return true;
+        if (c.nomeFantasia && c.nomeFantasia.toLowerCase().includes(cleanTermo)) return true;
+        return false;
+      });
 
       if (encontrados.length === 1) {
         // Encontrou exatamente um cliente de maneira inequívoca
@@ -377,14 +453,9 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
 
     setIsSavingCliente(true);
 
-    const codigoFinal =
-      clienteCodigo && clienteCodigo.trim() !== ''
-        ? clienteCodigo
-        : StorageService.getNextCodigoCliente();
-
     const novoCliente: Cliente = {
-      id: clienteId || `cli-${Date.now()}`,
-      codigo: codigoFinal,
+      id: clienteId || '',
+      codigo: clienteCodigo || '',
       cnpjCpf: formatCnpjCpf(clienteCpfCnpj),
       razaoSocial: clienteRazaoSocial.toUpperCase().trim(),
       nomeFantasia: clienteNomeFantasia ? clienteNomeFantasia.toUpperCase().trim() : undefined,
@@ -402,16 +473,11 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
       localEntregaPadrao: localEntrega || undefined,
     };
 
-    const res = StorageService.saveOrUpdateCliente(novoCliente);
-    onSaveCliente(res.clienteSalvo);
-    setClienteId(res.clienteSalvo.id);
-    setClienteCodigo(res.clienteSalvo.codigo);
-    setClienteOriginal(res.clienteSalvo);
-
+    onSaveCliente(novoCliente);
     setIsSavingCliente(false);
     setClienteFeedback({
       tipo: 'salvo',
-      mensagem: `Cliente salvo com sucesso — Código ${res.clienteSalvo.codigo}`,
+      mensagem: `Cliente salvo com sucesso no banco de dados.`,
     });
   };
 
@@ -421,17 +487,24 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
   const adicionarProdutoAoPedido = (p: Produto) => {
     const qtdPorCaixa =
       p.quantidadePorCaixa ||
-      (p.qtdMilheiroPorCaixa ? Math.round(p.qtdMilheiroPorCaixa * 1000) : 1);
-    const prCaixa = p.precoCaixa || p.precoUnitario;
-    const prUnidade =
-      p.precoUnidade || (qtdPorCaixa > 0 ? Number((prCaixa / qtdPorCaixa).toFixed(4)) : prCaixa);
-    const prMilheiro = p.precoMilheiro || Number((prUnidade * 1000).toFixed(2));
+      (p.qtdMilheiroPorCaixa ? Math.round(p.qtdMilheiroPorCaixa * 1000) : 1000);
+    const prMilheiro =
+      p.precoMilheiro ||
+      (p.precoUnidade
+        ? Number((p.precoUnidade * 1000).toFixed(2))
+        : p.precoCaixa && qtdPorCaixa > 0
+        ? Number(((p.precoCaixa / qtdPorCaixa) * 1000).toFixed(2))
+        : 90);
+    const prUnidade = Number((prMilheiro / 1000).toFixed(4));
+    const prCaixa = Number(((prMilheiro * qtdPorCaixa) / 1000).toFixed(2));
     const ipi = p.aliquotaIpi || 0;
-    const valorItens = prCaixa;
+    const valorUnitarioEfetivo =
+      p.unidadeMedida === 'UN' ? prUnidade : p.unidadeMedida === 'MIL' ? prMilheiro : prCaixa;
+    const valorItens = valorUnitarioEfetivo;
     const valorIpi = Number(((valorItens * ipi) / 100).toFixed(2));
 
     const novoItem: ItemPedido = {
-      id: `item-${Date.now()}-${itens.length}`,
+      id: '',
       produtoId: p.id,
       codigo: p.codigo,
       codigoInterno: p.codigoInterno,
@@ -444,7 +517,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
       precoUnidade: prUnidade,
       precoMilheiro: prMilheiro,
       qtdMilheiro: qtdPorCaixa / 1000,
-      precoUnitario: prCaixa,
+      precoUnitario: valorUnitarioEfetivo,
       aliquotaIpi: ipi,
       valorItens,
       valorIpi,
@@ -467,7 +540,22 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
       return;
     }
 
-    const encontrados = StorageService.searchProdutos(termo);
+    const cleanQ = termo.toLowerCase();
+    const cleanQSemZeros = cleanQ.replace(/^0+/, '');
+
+    // Filtra produtos respeitando a representada do pedido (se já selecionada)
+    const produtosFiltrados = representadaId
+      ? produtos.filter((p) => !p.representadaId || p.representadaId === representadaId)
+      : produtos;
+
+    const encontrados = produtosFiltrados.filter((p) => {
+      const codIntSemZeros = (p.codigoInterno || '').replace(/^0+/, '');
+      if (p.codigoInterno?.toLowerCase() === cleanQ || (cleanQSemZeros && codIntSemZeros === cleanQSemZeros)) return true;
+      if (p.codigo && p.codigo.toLowerCase().includes(cleanQ)) return true;
+      if (p.descricao && p.descricao.toLowerCase().includes(cleanQ)) return true;
+      if (p.referencia && p.referencia.toLowerCase().includes(cleanQ)) return true;
+      return false;
+    });
 
     if (encontrados.length === 1) {
       // Exatamente 1 produto encontrado: adiciona diretamente ao pedido!
@@ -485,10 +573,10 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
     setItens(itens.filter((_, i) => i !== index));
   };
 
-  // Edição segura de item no pedido (preserva snapshot e cálculos de caixa/unidade)
+  // Edição segura de item no pedido (Lógica invertida: milheiro cadastra, sistema soma caixa)
   const atualizarItemPedido = (
     index: number,
-    campo: 'quantidade' | 'unidadeMedida' | 'precoCaixa' | 'aliquotaIpi',
+    campo: 'quantidade' | 'unidadeMedida' | 'precoMilheiro' | 'precoCaixa' | 'aliquotaIpi',
     valor: any
   ) => {
     const novos = [...itens];
@@ -506,16 +594,36 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
       const novaUn = valor as string;
       item.unidadeMedida = novaUn;
       if (novaUn === 'UN') {
-        item.precoUnitario = item.precoUnidade || Number((item.precoCaixa! / qtdPorCx).toFixed(4));
+        item.precoUnitario = item.precoUnidade || Number(((item.precoMilheiro || 0) / 1000).toFixed(4));
+      } else if (novaUn === 'MIL') {
+        item.precoUnitario = item.precoMilheiro || 0;
       } else {
-        item.precoUnitario = item.precoCaixa || (pOriginal?.precoUnitario || 0);
+        item.precoUnitario = item.precoCaixa || 0;
       }
+    } else if (campo === 'precoMilheiro') {
+      // ENTRADA PRINCIPAL: Altera o Milheiro -> Sistema recalcula e soma a Caixa
+      const prMil = Math.max(0, Number(valor) || 0);
+      item.precoMilheiro = prMil;
+      item.precoUnidade = Number((prMil / 1000).toFixed(4));
+      item.precoCaixa = Number(((prMil * qtdPorCx) / 1000).toFixed(2));
+      item.precoUnitario =
+        item.unidadeMedida === 'UN'
+          ? item.precoUnidade
+          : item.unidadeMedida === 'MIL'
+          ? prMil
+          : item.precoCaixa;
     } else if (campo === 'precoCaixa') {
+      // Ajuste direto da Caixa -> sincroniza Milheiro
       const prCx = Math.max(0, Number(valor) || 0);
       item.precoCaixa = prCx;
       item.precoUnidade = Number((prCx / Math.max(1, qtdPorCx)).toFixed(4));
       item.precoMilheiro = Number((item.precoUnidade * 1000).toFixed(2));
-      item.precoUnitario = item.unidadeMedida === 'UN' ? item.precoUnidade : prCx;
+      item.precoUnitario =
+        item.unidadeMedida === 'UN'
+          ? item.precoUnidade
+          : item.unidadeMedida === 'MIL'
+          ? item.precoMilheiro
+          : prCx;
     } else if (campo === 'aliquotaIpi') {
       item.aliquotaIpi = Math.max(0, Number(valor) || 0);
     }
@@ -565,20 +673,31 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
 
     setIsSubmittingPedido(true);
 
-    const transp = transportadoras.find((t) => t.id === transportadoraId);
-    const vendedor = vendedores[0] || {
-      id: 'vend-1',
-      nome: 'Douglas Representações',
-      comissaoPadrao: 5.0,
-    };
+    const transp = transportadoras.find((t) => t.id === transportadoraId) || transportadoras[0];
+    const vendedorEncontrado =
+      vendedores.find((v) => v.id === vendedorId) ||
+      vendedores.find((v) => v.nome.toLowerCase().includes('douglas')) ||
+      vendedores[0];
+
+    const vendedor = vendedorEncontrado
+      ? {
+          id: vendedorEncontrado.id,
+          nome: vendedorEncontrado.nome,
+          comissaoPadrao: vendedorEncontrado.comissaoPadrao || 5.0,
+        }
+      : {
+          id: '',
+          nome: 'Douglas',
+          comissaoPadrao: 5.0,
+        };
 
     const codigoClienteGarantido =
       clienteCodigo && clienteCodigo.trim() !== ''
         ? clienteCodigo
-        : StorageService.getNextCodigoCliente();
+        : '';
 
     const clienteSnapshot: Cliente = {
-      id: clienteId || `cli-${Date.now()}`,
+      id: clienteId || '',
       codigo: codigoClienteGarantido,
       cnpjCpf: formatCnpjCpf(clienteCpfCnpj),
       razaoSocial: clienteRazaoSocial.toUpperCase().trim(),
@@ -599,37 +718,34 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
 
     const transpFinal =
       transp ||
-      transportadoras[0] || {
-        id: 'transp-default',
-        nome: 'Nosso Carro / Próprio',
-        cidade: 'Porto Alegre',
-        estado: 'RS',
-        tipoFretePadrao: 'CIF' as const,
-      };
+      transportadoras.find((t) => t.id === transportadoraId) ||
+      transportadoras[0];
 
     const empresaFinal =
+      representadas.find((r) => r.id === representadaId) ||
       pedidoParaEditar?.empresaEmissora ||
-      representadas[0] || {
-        id: 'rep-default',
-        nome: 'Litofix Embalagens',
-        razaoSocial: 'Litofix Embalagens Ltda',
-        cnpj: '00.000.000/0001-00',
-        ie: 'ISENTO',
-        endereco: 'Av. Industrial, 1000',
-        bairro: 'Industrial',
-        cidade: 'Porto Alegre',
-        estado: 'RS',
-        telefone: '(51) 3333-0000',
-      };
+      representadas[0];
 
+    if (!empresaFinal) {
+      alert('Por favor, selecione ou cadastre uma representada antes de gerar o pedido.');
+      setIsSubmittingPedido(false);
+      return;
+    }
+
+    const industriaNum = numeroPedidoIndustria.trim();
+    const ocCliente = ordemCompraCliente.trim();
     const pedidoSalvo: Pedido = {
-      id: pedidoParaEditar?.id || `ped-${Date.now()}`,
-      numero,
+      id: pedidoParaEditar?.id || '',
+      numeroSequencial: pedidoParaEditar?.numeroSequencial,
+      numero: pedidoParaEditar?.numero || (statusAlvo === 'Rascunho' ? 'RASCUNHO' : numero),
       tipo,
       status: statusAlvo,
+      situacaoComercial,
       dataCadastro: pedidoParaEditar?.dataCadastro || new Date().toISOString(),
       dataPrevista: previsaoEntrega,
-      numeroPedidoCliente: numeroClienteRef.trim(),
+      numeroPedidoIndustria: industriaNum,
+      ordemCompraCliente: ocCliente,
+      numeroPedidoCliente: ocCliente,
       empresaEmissora: empresaFinal,
       cliente: clienteSnapshot,
       localEntrega: localEntrega.trim(),
@@ -674,9 +790,14 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
 
         <div className="flex items-center gap-3">
           <div className="bg-white border-2 border-slate-300 rounded-xl px-4 py-2.5 shadow-xs">
-            <span className="text-xs font-bold text-slate-500 uppercase block">Número do Pedido</span>
+            <span className="text-2xs font-bold text-slate-500 uppercase tracking-wider block">
+              Nº do Pedido
+            </span>
             <span className="text-xl font-black text-indigo-700 tracking-wider font-mono">
               {numero}
+            </span>
+            <span className="text-[11px] font-medium text-slate-500 block mt-0.5">
+              Gerado automaticamente pelo sistema
             </span>
           </div>
         </div>
@@ -1150,27 +1271,92 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
             </div>
           </div>
 
+          {/* SELETOR DE SITUAÇÃO COMERCIAL (ENVIADO / FECHADO) */}
+          <div className="bg-slate-50 border-2 border-indigo-200 rounded-2xl p-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <label className="block text-sm font-bold text-slate-800 uppercase tracking-wide">
+                  Situação Comercial da Negociação <span className="text-red-600">*</span>
+                </label>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                  Classificação para acompanhamento do funil de vendas (independente do status técnico do pedido)
+                </p>
+              </div>
+
+              <div className="inline-flex p-1 bg-white border-2 border-slate-300 rounded-xl gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSituacaoComercial('Enviado')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    situacaoComercial === 'Enviado'
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>PEDIDO ENVIADO</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSituacaoComercial('Fechado')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    situacaoComercial === 'Fechado'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>PEDIDO FECHADO</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            {/* Nº / Referência do cliente */}
-            <div className="md:col-span-6">
+            {/* ORDEM DE COMPRA DO CLIENTE */}
+            <div className="md:col-span-4">
               <label
-                htmlFor="pedido-ref-cliente"
+                htmlFor="pedido-ordem-compra"
                 className="block text-base font-bold text-slate-800 mb-1.5"
               >
-                Nº / referência do cliente
+                Ordem de Compra do Cliente
               </label>
               <input
                 type="text"
-                id="pedido-ref-cliente"
-                value={numeroClienteRef}
-                onChange={(e) => setNumeroClienteRef(e.target.value)}
-                placeholder="Ex: Pedido de compra 79462"
-                className="w-full h-12 px-4 text-base bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
+                id="pedido-ordem-compra"
+                value={ordemCompraCliente}
+                onChange={(e) => setOrdemCompraCliente(e.target.value)}
+                placeholder="Ex: OC-2026-001 ou nº do comprador"
+                className="w-full h-12 px-4 text-base bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden font-medium"
               />
+              <p className="text-xs text-slate-500 mt-1 font-medium">
+                Identificador gerado pelo cliente. Preenchimento manual.
+              </p>
+            </div>
+
+            {/* Nº PEDIDO DA INDÚSTRIA */}
+            <div className="md:col-span-4">
+              <label
+                htmlFor="pedido-num-industria"
+                className="block text-base font-bold text-slate-800 mb-1.5"
+              >
+                Nº pedido da indústria
+              </label>
+              <input
+                type="text"
+                id="pedido-num-industria"
+                value={numeroPedidoIndustria}
+                onChange={(e) => setNumeroPedidoIndustria(e.target.value)}
+                placeholder="Digite o número informado pela indústria"
+                className="w-full h-12 px-4 text-base bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden font-medium"
+              />
+              <p className="text-xs text-slate-500 mt-1 font-medium">
+                Número fornecido pela indústria parceira. Preenchimento manual.
+              </p>
             </div>
 
             {/* Previsão de entrega */}
-            <div className="md:col-span-6">
+            <div className="md:col-span-4">
               <label
                 htmlFor="pedido-previsao-entrega"
                 className="block text-base font-bold text-slate-800 mb-1.5"
@@ -1184,6 +1370,72 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                 onChange={(e) => setPrevisaoEntrega(e.target.value)}
                 className="w-full h-12 px-4 text-base font-semibold bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
               />
+            </div>
+
+            {/* Representada / Empresa Emissora */}
+            <div className="md:col-span-6">
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="pedido-representada"
+                  className="text-base font-bold text-slate-800"
+                >
+                  Representada (Empresa Emissora) <span className="text-red-600">*</span>
+                </label>
+                <button
+                  type="button"
+                  id="btn-nova-representada"
+                  onClick={() => setShowRepresentadaModal(true)}
+                  className="text-sm font-bold text-indigo-700 hover:text-indigo-900 inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Nova representada</span>
+                </button>
+              </div>
+              <select
+                id="pedido-representada"
+                value={representadaId}
+                onChange={(e) => setRepresentadaId(e.target.value)}
+                className="w-full h-12 px-4 text-base font-semibold bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
+              >
+                {representadas.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Representante / Vendedor */}
+            <div className="md:col-span-6">
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="pedido-vendedor"
+                  className="text-base font-bold text-slate-800"
+                >
+                  Representante / Vendedor <span className="text-red-600">*</span>
+                </label>
+                <button
+                  type="button"
+                  id="btn-novo-representante"
+                  onClick={() => setShowRepresentanteModal(true)}
+                  className="text-sm font-bold text-indigo-700 hover:text-indigo-900 inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Novo representante</span>
+                </button>
+              </div>
+              <select
+                id="pedido-vendedor"
+                value={vendedorId}
+                onChange={(e) => setVendedorId(e.target.value)}
+                className="w-full h-12 px-4 text-base font-semibold bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
+              >
+                {vendedores.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.nome} ({v.comissaoPadrao || 5}% comissão)
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Transportadora */}
@@ -1494,7 +1746,8 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                   {resultadosBuscaProduto.map((p) => {
                     const repNome =
                       representadas.find((r) => r.id === p.representadaId)?.nome ||
-                      'Litofix Embalagens';
+                      representadas[0]?.nome ||
+                      'Não informada';
                     const qtdCx =
                       p.quantidadePorCaixa ||
                       (p.qtdMilheiroPorCaixa ? Math.round(p.qtdMilheiroPorCaixa * 1000) : 1);
@@ -1536,18 +1789,16 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                           </div>
 
                           <div className="flex flex-wrap items-center gap-x-4 text-xs font-bold text-slate-800 pt-1">
-                            <span className="text-indigo-800">
+                            <span className="text-indigo-900 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md">
+                              R$ {(p.precoMilheiro || (p.precoUnidade ? p.precoUnidade * 1000 : (prCx / (qtdCx || 1)) * 1000)).toFixed(2)} / milheiro
+                            </span>
+                            <span className="text-slate-700">
                               {formatCurrency(prCx)} / {p.unidadeMedida === 'CX' ? 'caixa' : 'unidade'}
                             </span>
                             {p.unidadeMedida === 'CX' && (
-                              <>
-                                <span className="text-slate-600">
-                                  R$ {prUn.toFixed(4)} / unidade
-                                </span>
-                                <span className="text-slate-600">
-                                  R$ {(prUn * 1000).toFixed(2)} / milheiro
-                                </span>
-                              </>
+                              <span className="text-slate-500 font-medium">
+                                (R$ {prUn.toFixed(4)} / un.)
+                              </span>
                             )}
                           </div>
                         </div>
@@ -1583,7 +1834,8 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                 const prodRef = produtos.find((p) => p.id === item.produtoId);
                 const representadaNome =
                   representadas.find((r) => r.id === prodRef?.representadaId)?.nome ||
-                  'Litofix Embalagens';
+                  representadas[0]?.nome ||
+                  'Não informada';
 
                 const qtdCx =
                   item.quantidadePorCaixa ||
@@ -1599,7 +1851,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
 
                 return (
                   <div
-                    key={item.id}
+                    key={item.id || `${item.produtoId}-${idx}`}
                     className="p-5 sm:p-6 bg-white border-2 border-slate-300 rounded-2xl hover:border-indigo-400 transition-all shadow-xs space-y-4"
                   >
                     {/* CABEÇALHO DO ITEM */}
@@ -1643,12 +1895,12 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                       </span>
                     </div>
 
-                    {/* CAMPOS DE OPERAÇÃO DO ITEM */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                    {/* CAMPOS DE OPERAÇÃO DO ITEM (LÓGICA INVERTIDA: MILHEIRO -> SOMA CAIXA) */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                       {/* QUANTIDADE */}
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-2">
                         <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                          {item.unidadeMedida === 'CX' ? 'Qtd. de Caixas' : 'Quantidade'}
+                          {item.unidadeMedida === 'CX' ? 'Qtd. Caixas' : 'Quantidade'}
                         </label>
                         <input
                           type="number"
@@ -1681,12 +1933,33 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                         </select>
                       </div>
 
-                      {/* PREÇO DA CAIXA / COMERCIAL */}
-                      <div className="md:col-span-4">
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                          {item.unidadeMedida === 'CX'
-                            ? 'Preço por Caixa (R$)'
-                            : 'Preço Unitário (R$)'}
+                      {/* ENTRADA 1: PREÇO POR MILHEIRO (VALOR BASE INFORMADO) */}
+                      <div className="md:col-span-3">
+                        <label className="block text-xs font-black text-indigo-950 uppercase mb-1 flex items-center justify-between">
+                          <span>Pr. Milheiro (R$) *</span>
+                          <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">
+                            Base
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.precoMilheiro || 0}
+                          onChange={(e) =>
+                            atualizarItemPedido(idx, 'precoMilheiro', e.target.value)
+                          }
+                          className="w-full h-12 px-3 text-lg font-mono font-black text-right text-indigo-950 bg-white border-2 border-indigo-500 rounded-xl focus:border-indigo-700 outline-hidden shadow-xs"
+                        />
+                      </div>
+
+                      {/* ENTRADA 2: PREÇO DA CAIXA (SOMA DO SISTEMA) */}
+                      <div className="md:col-span-3">
+                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                          <span>{item.unidadeMedida === 'CX' ? 'Pr. Caixa (R$)' : 'Pr. Unitário (R$)'}</span>
+                          <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1 rounded">
+                            Soma do sistema
+                          </span>
                         </label>
                         <input
                           type="number"
@@ -1696,14 +1969,14 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                           onChange={(e) =>
                             atualizarItemPedido(idx, 'precoCaixa', e.target.value)
                           }
-                          className="w-full h-12 px-3 text-lg font-mono font-black text-right text-indigo-900 bg-white border-2 border-indigo-400 rounded-xl focus:border-indigo-700 outline-hidden"
+                          className="w-full h-12 px-3 text-lg font-mono font-bold text-right text-slate-900 bg-slate-50 border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
                         />
                       </div>
 
                       {/* ALÍQUOTA IPI */}
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-2">
                         <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                          Alíquota IPI (%)
+                          IPI (%)
                         </label>
                         <input
                           type="number"
@@ -1722,20 +1995,22 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                     <div className="bg-slate-50 border-2 border-indigo-100 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div>
                         <span className="text-xs font-bold text-slate-500 uppercase block">
-                          Preço por unidade
+                          Preço do Milheiro (Base)
                         </span>
-                        <span className="text-lg font-black text-slate-900 font-mono">
-                          R$ {prUnEfetivo.toFixed(4)}
+                        <span className="text-lg font-black text-indigo-900 font-mono">
+                          R$ {prMilEfetivo.toFixed(2)}
                         </span>
+                        <span className="text-[11px] text-slate-500 block">/ 1.000 un.</span>
                       </div>
 
                       <div>
                         <span className="text-xs font-bold text-slate-500 uppercase block">
-                          Preço por 1.000
+                          Preço da Caixa (Soma)
                         </span>
-                        <span className="text-lg font-black text-indigo-800 font-mono">
-                          R$ {prMilEfetivo.toFixed(2)}
+                        <span className="text-lg font-black text-emerald-800 font-mono">
+                          R$ {prCaixaEfetivo.toFixed(2)}
                         </span>
+                        <span className="text-[11px] text-slate-500 block">({qtdCx.toLocaleString('pt-BR')} un./cx)</span>
                       </div>
 
                       <div>
@@ -1745,6 +2020,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                         <span className="text-lg font-black text-amber-800 font-mono">
                           {formatCurrency(item.valorIpi)} ({item.aliquotaIpi}%)
                         </span>
+                        <span className="text-[11px] text-slate-500 block">Un: R$ {prUnEfetivo.toFixed(4)}</span>
                       </div>
 
                       <div className="text-right">
@@ -1883,6 +2159,34 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
             onSaveTransportadora(nova);
             setTransportadoraId(nova.id);
             setShowTranspModal(false);
+          }}
+        />
+      )}
+
+      {showRepresentadaModal && (
+        <RepresentadaModal
+          isOpen={showRepresentadaModal}
+          onClose={() => setShowRepresentadaModal(false)}
+          onSave={(nova) => {
+            if (onSaveRepresentada) {
+              onSaveRepresentada(nova);
+            }
+            setRepresentadaId(nova.id);
+            setShowRepresentadaModal(false);
+          }}
+        />
+      )}
+
+      {showRepresentanteModal && (
+        <RepresentanteModal
+          isOpen={showRepresentanteModal}
+          onClose={() => setShowRepresentanteModal(false)}
+          onSave={(novo) => {
+            if (onSaveVendedor) {
+              onSaveVendedor(novo);
+            }
+            setVendedorId(novo.id);
+            setShowRepresentanteModal(false);
           }}
         />
       )}

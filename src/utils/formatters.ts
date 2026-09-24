@@ -1,10 +1,22 @@
-export function formatCurrency(value: number | undefined | null, includeSymbol = true): string {
+export function formatCurrency(
+  value: number | undefined | null,
+  includeSymbol: boolean | number = true,
+  decimals = 2
+): string {
   const num = Number(value) || 0;
+  let sym = true;
+  let dec = decimals;
+  if (typeof includeSymbol === 'number') {
+    dec = includeSymbol;
+    sym = true;
+  } else {
+    sym = includeSymbol;
+  }
   const formatted = num.toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: dec,
+    maximumFractionDigits: dec,
   });
-  return includeSymbol ? `R$ ${formatted}` : formatted;
+  return sym ? `R$ ${formatted}` : formatted;
 }
 
 export function formatNumber(value: number | undefined | null, decimals = 2): string {
@@ -146,4 +158,13 @@ export function formatPhone(value?: string): string {
     return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
   }
   return value;
+}
+
+/**
+ * Formata o número sequencial comercial do pedido do sistema.
+ * Exemplo: 1 -> PED000001, 2 -> PED000002
+ */
+export function formatPedidoNumero(seq: number | undefined | null): string {
+  if (!seq || seq <= 0) return 'RASCUNHO';
+  return `PED${String(seq).padStart(6, '0')}`;
 }
