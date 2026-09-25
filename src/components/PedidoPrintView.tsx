@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Printer,
   Share2,
@@ -12,6 +12,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
+  Smartphone,
 } from 'lucide-react';
 import { Pedido } from '../types';
 import {
@@ -23,7 +24,7 @@ import {
   formatCep,
   formatPhone,
 } from '../utils/formatters';
-import { downloadElementAsPdf } from '../utils/pdfGenerator';
+import { downloadElementAsPdf, shareElementAsPdf } from '../utils/pdfGenerator';
 
 interface PedidoPrintViewProps {
   pedido: Pedido;
@@ -36,7 +37,14 @@ export const PedidoPrintView: React.FC<PedidoPrintViewProps> = ({ pedido, onBack
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfSuccessMessage, setPdfSuccessMessage] = useState<string | null>(null);
   const [pdfErrorMessage, setPdfErrorMessage] = useState<string | null>(null);
+  const [canShareFile, setCanShareFile] = useState(false);
   const documentoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'canShare' in navigator) {
+      setCanShareFile(true);
+    }
+  }, []);
 
   // Download real do arquivo PDF
   const handleBaixarPdf = async () => {
@@ -60,7 +68,7 @@ export const PedidoPrintView: React.FC<PedidoPrintViewProps> = ({ pedido, onBack
         onStart: () => setIsGeneratingPdf(true),
         onSuccess: () => {
           setIsGeneratingPdf(false);
-          setPdfSuccessMessage(`Arquivo "${nomeArquivo}" gerado e baixado com sucesso!`);
+          setPdfSuccessMessage(`Arquivo "${nomeArquivo}" baixado com sucesso!`);
           setTimeout(() => setPdfSuccessMessage(null), 5000);
         },
         onError: (err) => {
@@ -71,6 +79,41 @@ export const PedidoPrintView: React.FC<PedidoPrintViewProps> = ({ pedido, onBack
     } catch (err: any) {
       setIsGeneratingPdf(false);
       setPdfErrorMessage('Erro ao converter o documento para PDF. Tente novamente ou use a opção de Imprimir.');
+    }
+  };
+
+  // Salvar / Compartilhar nativo no Celular (WhatsApp, Arquivos do iPhone, Google Drive no Android)
+  const handleCompartilharPdf = async () => {
+    if (!documentoRef.current) return;
+
+    const sanitizedNomeCliente = (pedido.cliente?.razaoSocial || 'Cliente')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .slice(0, 30);
+
+    const tipoPrefixo = pedido.tipo === 'ORCAMENTO' ? 'Orcamento' : 'Pedido';
+    const nomeArquivo = `${tipoPrefixo}_${pedido.numero}_${sanitizedNomeCliente}.pdf`;
+    const titulo = `${pedido.tipo === 'ORCAMENTO' ? 'Orçamento' : 'Pedido'} ${pedido.numero} - ${pedido.cliente.razaoSocial}`;
+
+    setIsGeneratingPdf(true);
+    setPdfErrorMessage(null);
+    setPdfSuccessMessage(null);
+
+    try {
+      const compartilhou = await shareElementAsPdf(documentoRef.current, nomeArquivo, titulo);
+      setIsGeneratingPdf(false);
+      if (compartilhou) {
+        setPdfSuccessMessage('PDF compartilhado / salvo com sucesso no celular!');
+      } else {
+        setPdfSuccessMessage(`Arquivo "${nomeArquivo}" baixado com sucesso!`);
+      }
+      setTimeout(() => setPdfSuccessMessage(null), 5000);
+    } catch (err: any) {
+      setIsGeneratingPdf(false);
+      if (err.name !== 'AbortError') {
+        setPdfErrorMessage('Não foi possível compartilhar o arquivo no momento.');
+      }
     }
   };
 
@@ -214,21 +257,56 @@ Ficamos à disposição para qualquer esclarecimento!`);
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Barra de Ações Superior (Oculta na Impressão) */}
-      <div className="no-print bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs flex flex-col lg:flex-row items-center justify-between gap-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-full lg:w-auto inline-flex items-center justify-center gap-2 text-base font-bold text-slate-700 hover:text-slate-900 px-5 py-3 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer border border-slate-300"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Voltar para Pedidos</span>
-        </button>
+      <div className="no-print bg-white rounded-2xl border-2 border-slate-300 p-4 sm:p-5 shadow-xs flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center justify-center gap-2 text-base font-bold text-slate-700 hover:text-slate-900 px-5 py-3 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer border border-slate-300 min-h-[44px]"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>Voltar para Pedidos</span>
+          </button>
 
-        <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 w-full lg:w-auto">
+          {/* BOTÕES DE DESTAQUE: BAIXAR PDF E COMPARTILHAR */}
+          <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
+            {canShareFile && (
+              <button
+                type="button"
+                id="btn-compartilhar-pdf"
+                onClick={handleCompartilharPdf}
+                disabled={isGeneratingPdf}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm sm:text-base font-bold text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border-2 border-indigo-300 rounded-xl transition-all cursor-pointer disabled:opacity-50 min-h-[44px]"
+                title="Salvar em Arquivos ou enviar pelo WhatsApp"
+              >
+                <Share2 className="w-4 h-4 text-indigo-700" />
+                <span>Salvar / Compartilhar no Celular</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              id="btn-baixar-pdf"
+              onClick={handleBaixarPdf}
+              disabled={isGeneratingPdf}
+              className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 text-base font-black text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl shadow-md shadow-indigo-700/20 transition-all cursor-pointer disabled:opacity-50 min-h-[48px]"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 className="w-5 h-5 animate-spin text-white" />
+              ) : (
+                <Download className="w-5 h-5 text-indigo-200" />
+              )}
+              <span>{isGeneratingPdf ? 'Gerando PDF...' : 'BAIXAR PDF'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Linha secundária de ações rápidas */}
+        <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 pt-2 border-t border-slate-200">
           <button
             type="button"
             onClick={() => onEdit(pedido)}
-            className="inline-flex items-center gap-2 px-4 py-3 text-base font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors cursor-pointer min-h-[40px]"
           >
             <Edit3 className="w-4 h-4 text-slate-600" />
             <span>Editar</span>
@@ -237,7 +315,7 @@ Ficamos à disposição para qualquer esclarecimento!`);
           <button
             type="button"
             onClick={handleCopiarTexto}
-            className="inline-flex items-center gap-2 px-4 py-3 text-base font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors cursor-pointer min-h-[40px]"
           >
             {copiado ? (
               <Check className="w-4 h-4 text-emerald-600" />
@@ -250,60 +328,50 @@ Ficamos à disposição para qualquer esclarecimento!`);
           <button
             type="button"
             onClick={handleEnviarWhatsapp}
-            className="inline-flex items-center gap-2 px-5 py-3 text-base font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-300 rounded-xl transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-300 rounded-xl transition-colors cursor-pointer min-h-[40px]"
           >
             <Share2 className="w-4 h-4" />
-            <span>WhatsApp</span>
+            <span>Texto WhatsApp</span>
           </button>
 
           <button
             type="button"
             onClick={handleImprimir}
-            className="inline-flex items-center gap-2 px-5 py-3 text-base font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 rounded-xl transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 rounded-xl transition-colors cursor-pointer min-h-[40px]"
           >
-            <Printer className="w-5 h-5 text-slate-700" />
+            <Printer className="w-4 h-4 text-slate-700" />
             <span>Imprimir</span>
-          </button>
-
-          {/* BOTÃO PRINCIPAL: BAIXAR PDF */}
-          <button
-            type="button"
-            id="btn-baixar-pdf"
-            onClick={handleBaixarPdf}
-            disabled={isGeneratingPdf}
-            className="inline-flex items-center justify-center gap-2.5 px-7 py-3 text-base font-black text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl shadow-md shadow-indigo-700/20 transition-all cursor-pointer disabled:opacity-50"
-          >
-            {isGeneratingPdf ? (
-              <Loader2 className="w-5 h-5 animate-spin text-white" />
-            ) : (
-              <Download className="w-5 h-5 text-indigo-200" />
-            )}
-            <span>{isGeneratingPdf ? 'Gerando PDF...' : 'BAIXAR PDF'}</span>
           </button>
         </div>
       </div>
 
       {/* FEEDBACK DE SUCESSO OU ERRO DO PDF */}
       {pdfSuccessMessage && (
-        <div className="no-print p-4 bg-emerald-50 border-2 border-emerald-300 rounded-xl text-emerald-900 font-bold text-base flex items-center gap-3 animate-in fade-in duration-200">
+        <div className="no-print p-4 bg-emerald-50 border-2 border-emerald-300 rounded-xl text-emerald-900 font-bold text-sm sm:text-base flex items-center gap-3 animate-in fade-in duration-200">
           <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
           <span>{pdfSuccessMessage}</span>
         </div>
       )}
 
       {pdfErrorMessage && (
-        <div className="no-print p-4 bg-red-50 border-2 border-red-300 rounded-xl text-red-900 font-bold text-base flex items-center gap-3 animate-in fade-in duration-200">
+        <div className="no-print p-4 bg-red-50 border-2 border-red-300 rounded-xl text-red-900 font-bold text-sm sm:text-base flex items-center gap-3 animate-in fade-in duration-200">
           <AlertTriangle className="w-6 h-6 text-red-600 shrink-0" />
           <span>{pdfErrorMessage}</span>
         </div>
       )}
 
-      {/* DOCUMENTO OFICIAL A4 (Réplica fiel da folha impressa) */}
-      <div
-        ref={documentoRef}
-        id="documento-impresso"
-        className="print-container bg-white rounded-none sm:rounded-xl shadow-md border border-slate-300 max-w-[210mm] mx-auto p-8 font-sans text-slate-900"
-      >
+      {/* Aviso informativo em telas menores */}
+      <div className="no-print block sm:hidden text-center text-xs text-slate-500 font-medium bg-slate-100 py-2 px-3 rounded-lg border border-slate-200">
+        ↔ Deslize para os lados para visualizar a folha completa. O PDF baixado é formatado em página A4 oficial.
+      </div>
+
+      {/* DOCUMENTO OFICIAL A4 (Réplica fiel da folha impressa com scroll horizontal no celular) */}
+      <div className="overflow-x-auto pb-6 -mx-3 sm:mx-0 px-3 sm:px-0">
+        <div
+          ref={documentoRef}
+          id="documento-impresso"
+          className="print-container bg-white rounded-xl shadow-md border border-slate-300 min-w-[680px] max-w-[210mm] mx-auto p-6 sm:p-8 font-sans text-slate-900"
+        >
         {/* Topo: Página */}
         <div className="text-right text-[10px] text-slate-500 font-mono mb-1">
           Página 1 de 1
@@ -594,6 +662,7 @@ Ficamos à disposição para qualquer esclarecimento!`);
 
         {/* LINHA FINAL INFERIOR */}
         <div className="border-t-2 border-black mt-6"></div>
+      </div>
       </div>
     </div>
   );

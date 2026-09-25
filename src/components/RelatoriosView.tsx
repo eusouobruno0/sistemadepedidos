@@ -270,62 +270,62 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* NAVEGAÇÃO DE SUB-ABAS INTERNAS EM RELATÓRIOS (DESKTOP-FIRST) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-xs flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
+      {/* NAVEGAÇÃO DE SUB-ABAS INTERNAS EM RELATÓRIOS (MOBILE & DESKTOP) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none w-full sm:w-auto">
           <button
             type="button"
             id="subtab-pedidos"
             onClick={() => setSubAba('pedidos')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 min-h-[38px] ${
               subAba === 'pedidos'
                 ? 'bg-indigo-700 text-white shadow-xs'
                 : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <FileText className="w-4 h-4" />
-            <span>Histórico de Pedidos ({pedidos.length})</span>
+            <FileText className="w-3.5 h-3.5" />
+            <span>Histórico ({pedidos.length})</span>
           </button>
 
           <button
             type="button"
             id="subtab-visao-geral"
             onClick={() => setSubAba('visaoGeral')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 min-h-[38px] ${
               subAba === 'visaoGeral'
                 ? 'bg-indigo-700 text-white shadow-xs'
                 : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <TrendingUp className="w-4 h-4" />
-            <span>Visão Geral & Faturamento</span>
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Visão Geral</span>
           </button>
 
           <button
             type="button"
             id="subtab-comissoes"
             onClick={() => setSubAba('comissoes')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 min-h-[38px] ${
               subAba === 'comissoes'
                 ? 'bg-indigo-700 text-white shadow-xs'
                 : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Users className="w-4 h-4" />
-            <span>Comissões por Representante</span>
+            <Users className="w-3.5 h-3.5" />
+            <span>Comissões</span>
           </button>
 
           <button
             type="button"
             id="subtab-marcas"
             onClick={() => setSubAba('marcas')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 min-h-[38px] ${
               subAba === 'marcas'
                 ? 'bg-indigo-700 text-white shadow-xs'
                 : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Building className="w-4 h-4" />
+            <Building className="w-3.5 h-3.5" />
             <span>Marcas & Condições</span>
           </button>
         </div>

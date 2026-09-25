@@ -320,8 +320,8 @@ export const CadastrosManager: React.FC<CadastrosManagerProps> = ({
               )}
             </div>
 
-            {/* Alternância Rápida entre Cadastros */}
-            <div className="flex flex-wrap items-center gap-1">
+            {/* Alternância Rápida entre Cadastros (Scroll horizontal em celular) */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none w-full sm:w-auto">
               {modulos.map((m) => {
                 const Icone = m.icone;
                 const isCurrent = abaAtiva === m.id;
@@ -333,7 +333,7 @@ export const CadastrosManager: React.FC<CadastrosManagerProps> = ({
                       setAbaAtiva(m.id);
                       setBusca('');
                     }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer min-h-[36px] ${
                       isCurrent
                         ? 'bg-blue-600 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
