@@ -642,9 +642,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     const taxa = p.vendedor.comissaoPadrao || 5;
                     const comissao = (p.totalItens || 0) * taxa / 100;
                     return <tr key={p.id} className="hover:bg-slate-50">
-                      <td className="py-3 px-4 font-black font-mono text-indigo-700">{p.numeroPedido}</td>
+                      <td className="py-3 px-4 font-black font-mono text-indigo-700">{p.numero || 'RASCUNHO'}</td>
                       <td className="py-3 px-4 whitespace-nowrap">{formatDateBR(p.dataCadastro)}</td>
-                      <td className="py-3 px-4 font-semibold text-slate-800">{p.cliente.nomeRazao}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-800">{p.cliente?.razaoSocial || p.cliente?.nomeFantasia || 'Cliente não identificado'}</td>
                       <td className="py-3 px-4">{p.vendedor.nome}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold">{formatCurrency(p.totalItens || 0)}</td>
                       <td className="py-3 px-3 text-center font-mono">{taxa}%</td>
