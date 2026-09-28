@@ -555,68 +555,103 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         </div>
       )}
 
-      {/* 3. SUB-ABA: COMISSÕES POR REPRESENTANTE */}
+      {/* 3. SUB-ABA: COMISSÕES */}
       {subAba === 'comissoes' && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-              <div>
-                <h3 className="font-bold text-xs text-slate-800 uppercase tracking-wider">
-                  Comissões por Representante (Baseado em Pedidos Fechados)
-                </h3>
-                <p className="text-2xs text-slate-500 mt-0.5">
-                  IPI mantido em coluna segregada e rigorosamente excluído da base de comissão
-                </p>
+        <div className="space-y-5">
+          {/* Filtros rápidos de comissão */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+            <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
+                <div>
+                  <label className="block text-2xs font-bold text-slate-500 uppercase mb-1">Data início</label>
+                  <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" />
+                </div>
+                <div>
+                  <label className="block text-2xs font-bold text-slate-500 uppercase mb-1">Data fim</label>
+                  <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" />
+                </div>
+                <div>
+                  <label className="block text-2xs font-bold text-slate-500 uppercase mb-1">Vendedor</label>
+                  <select value={filtroVendedor} onChange={(e) => setFiltroVendedor(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+                    <option value="TODOS">Todos os vendedores</option>
+                    {vendedores.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                  </select>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-2xs text-slate-400 block font-medium">Comissão Total Estimada:</span>
-                <span className="text-base font-black font-mono text-purple-700">
-                  {formatCurrency(totais.totalComissao)}
-                </span>
-              </div>
+              <button type="button" onClick={() => { setDataInicio(''); setDataFim(''); setFiltroVendedor('TODOS'); }} className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50">Limpar filtros</button>
             </div>
+          </div>
 
+          {/* Resumo geral */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+              <div className="text-2xs font-bold text-slate-500 uppercase tracking-wider">Pedidos com comissão</div>
+              <div className="text-3xl font-black text-slate-900 mt-2">{totais.qtdFechados}</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-200 p-5 shadow-xs">
+              <div className="text-2xs font-bold text-emerald-700 uppercase tracking-wider">Base de comissão · sem IPI</div>
+              <div className="text-2xl font-black font-mono text-emerald-800 mt-2">{formatCurrency(totais.baseItensFechados)}</div>
+            </div>
+            <div className="bg-purple-50 rounded-2xl border-2 border-purple-200 p-5 shadow-xs">
+              <div className="text-2xs font-bold text-purple-700 uppercase tracking-wider">Comissão total</div>
+              <div className="text-3xl font-black font-mono text-purple-800 mt-2">{formatCurrency(totais.totalComissao)}</div>
+            </div>
+          </div>
+
+          {/* Vendedores em destaque */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-black text-slate-900">Comissão por vendedor</h3>
+                <p className="text-xs text-slate-500">Clique em um vendedor para ver somente os pedidos dele.</p>
+              </div>
+              {filtroVendedor !== 'TODOS' && <button type="button" onClick={() => setFiltroVendedor('TODOS')} className="text-xs font-bold text-indigo-700">Ver todos</button>}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {relatorioPorVendedor.map((item) => (
+                <button key={item.vendedor.id} type="button" onClick={() => setFiltroVendedor(item.vendedor.id)} className={`text-left rounded-2xl border-2 p-5 transition-all hover:shadow-md ${filtroVendedor === item.vendedor.id ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-lg font-black text-slate-900">{item.vendedor.nome}</div>
+                      <div className="text-xs text-slate-500 mt-1">{item.qtdFechados} pedidos fechados · {item.vendedor.comissaoPadrao || 5}%</div>
+                    </div>
+                    <Users className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mt-5">
+                    <div><div className="text-2xs uppercase font-bold text-slate-400">Base</div><div className="font-bold font-mono text-slate-800 mt-1">{formatCurrency(item.totalItens)}</div></div>
+                    <div><div className="text-2xs uppercase font-bold text-purple-600">Comissão</div><div className="font-black font-mono text-purple-800 mt-1">{formatCurrency(item.comissaoValor)}</div></div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Detalhamento pedido por pedido */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/60">
+              <h3 className="font-black text-sm text-slate-900">Comissão por pedido</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Detalhamento dos pedidos fechados no período selecionado.</p>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200">
-                    <th className="py-2.5 px-4">Representante</th>
-                    <th className="py-2.5 px-3 text-center">Fechados</th>
-                    <th className="py-2.5 px-3 text-center">Enviados</th>
-                    <th className="py-2.5 px-4 text-right">Base Itens (Sem IPI)</th>
-                    <th className="py-2.5 px-4 text-right text-blue-700">Total IPI</th>
-                    <th className="py-2.5 px-4 text-right">Faturamento Fechado</th>
-                    <th className="py-2.5 px-3 text-center">% Comis.</th>
-                    <th className="py-2.5 px-4 text-right text-purple-700">Valor Comissão</th>
-                  </tr>
-                </thead>
+                <thead><tr className="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200">
+                  <th className="py-3 px-4">Pedido</th><th className="py-3 px-4">Data</th><th className="py-3 px-4">Cliente</th><th className="py-3 px-4">Vendedor</th><th className="py-3 px-4 text-right">Base sem IPI</th><th className="py-3 px-3 text-center">%</th><th className="py-3 px-4 text-right text-purple-700">Comissão</th>
+                </tr></thead>
                 <tbody className="divide-y divide-slate-100">
-                  {relatorioPorVendedor.map((item) => (
-                    <tr key={item.vendedor.id} className="hover:bg-slate-50/80">
-                      <td className="py-2.5 px-4 font-bold text-slate-900">{item.vendedor.nome}</td>
-                      <td className="py-2.5 px-3 text-center font-bold font-mono text-emerald-700">
-                        {item.qtdFechados}
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono text-amber-700">
-                        {item.qtdEnviados}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-800">
-                        {formatCurrency(item.totalItens)}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-medium text-blue-700 bg-blue-50/20">
-                        {formatCurrency(item.totalIpi)}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-800">
-                        {formatCurrency(item.totalGeral)}
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700">
-                        {item.vendedor.comissaoPadrao}%
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-black text-purple-800 bg-purple-50/30">
-                        {formatCurrency(item.comissaoValor)}
-                      </td>
-                    </tr>
-                  ))}
+                  {pedidosFechadosEfetivos.map((p) => {
+                    const taxa = p.vendedor.comissaoPadrao || 5;
+                    const comissao = (p.totalItens || 0) * taxa / 100;
+                    return <tr key={p.id} className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-black font-mono text-indigo-700">{p.numeroPedido}</td>
+                      <td className="py-3 px-4 whitespace-nowrap">{formatDateBR(p.dataCadastro)}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-800">{p.cliente.nomeRazao}</td>
+                      <td className="py-3 px-4">{p.vendedor.nome}</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold">{formatCurrency(p.totalItens || 0)}</td>
+                      <td className="py-3 px-3 text-center font-mono">{taxa}%</td>
+                      <td className="py-3 px-4 text-right font-mono font-black text-purple-800">{formatCurrency(comissao)}</td>
+                    </tr>;
+                  })}
+                  {pedidosFechadosEfetivos.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-400">Nenhum pedido fechado encontrado neste período.</td></tr>}
                 </tbody>
               </table>
             </div>
