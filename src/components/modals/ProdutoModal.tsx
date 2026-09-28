@@ -26,14 +26,14 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
   const [representadaId, setRepresentadaId] = useState<string>('');
 
   // Modelagem Caixa e Unidade (Fonte única: precoMilheiro)
-  const [quantidadePorCaixa, setQuantidadePorCaixa] = useState<number>(1000);
-  const [precoCaixa, setPrecoCaixa] = useState<number>(90);
-  const [precoUnidade, setPrecoUnidade] = useState<number>(0.09);
-  const [precoMilheiro, setPrecoMilheiro] = useState<number>(90);
+  const [quantidadePorCaixa, setQuantidadePorCaixa] = useState<number | ''>('');
+  const [precoCaixa, setPrecoCaixa] = useState<number | ''>('');
+  const [precoUnidade, setPrecoUnidade] = useState<number | ''>('');
+  const [precoMilheiro, setPrecoMilheiro] = useState<number | ''>('');
 
   // Impostos e peso
-  const [aliquotaIpi, setAliquotaIpi] = useState<number>(0);
-  const [pesoUnitarioKg, setPesoUnitarioKg] = useState<number>(0);
+  const [aliquotaIpi, setAliquotaIpi] = useState<number | ''>('');
+  const [pesoUnitarioKg, setPesoUnitarioKg] = useState<number | ''>('');
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
@@ -63,12 +63,12 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
         setReferencia('');
         setUnidadeMedida('CX');
         setRepresentadaId(representadas[0]?.id || '');
-        setQuantidadePorCaixa(1000);
-        setPrecoMilheiro(90);
-        setPrecoUnidade(0.09);
-        setPrecoCaixa(90);
-        setAliquotaIpi(0);
-        setPesoUnitarioKg(0);
+        setQuantidadePorCaixa('');
+        setPrecoMilheiro('');
+        setPrecoUnidade('');
+        setPrecoCaixa('');
+        setAliquotaIpi('');
+        setPesoUnitarioKg('');
       }
       setError('');
     }
@@ -77,8 +77,9 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
   if (!isOpen) return null;
 
   // 1. Quando o usuário altera o Preço do Milheiro (FONTE DE VERDADE)
-  const handlePrecoMilheiroChange = (valorMilheiro: number) => {
-    const mil = Math.max(0, valorMilheiro);
+  const handlePrecoMilheiroChange = (valor: string) => {
+    if (valor === '') { setPrecoMilheiro(''); setPrecoUnidade(''); setPrecoCaixa(''); return; }
+    const mil = Math.max(0, Number(valor));
     setPrecoMilheiro(mil);
     const un = Number((mil / 1000).toFixed(4));
     setPrecoUnidade(un);
@@ -87,8 +88,9 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
   };
 
   // 2. Quando altera a Quantidade por Caixa
-  const handleQtdCaixaChange = (qtd: number) => {
-    const q = Math.max(1, qtd);
+  const handleQtdCaixaChange = (valor: string) => {
+    if (valor === '') { setQuantidadePorCaixa(''); setPrecoCaixa(''); return; }
+    const q = Math.max(1, Number(valor));
     setQuantidadePorCaixa(q);
     if (precoMilheiro > 0) {
       setPrecoCaixa(Number(((precoMilheiro * q) / 1000).toFixed(2)));
@@ -96,8 +98,9 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
   };
 
   // 3. Ajuste direto do Preço da Caixa
-  const handlePrecoCaixaChange = (valorCx: number) => {
-    const cx = Math.max(0, valorCx);
+  const handlePrecoCaixaChange = (valor: string) => {
+    if (valor === '') { setPrecoCaixa(''); setPrecoUnidade(''); setPrecoMilheiro(''); return; }
+    const cx = Math.max(0, Number(valor));
     setPrecoCaixa(cx);
     const qtd = Math.max(1, quantidadePorCaixa || 1);
     const un = Number((cx / qtd).toFixed(4));
@@ -277,7 +280,7 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
                   type="number"
                   min="1"
                   value={quantidadePorCaixa}
-                  onChange={(e) => handleQtdCaixaChange(Number(e.target.value))}
+                  onChange={(e) => handleQtdCaixaChange(e.target.value)}
                   className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900"
                 />
               </div>
@@ -292,7 +295,7 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
                   min="0"
                   required
                   value={precoMilheiro}
-                  onChange={(e) => handlePrecoMilheiroChange(Number(e.target.value))}
+                  onChange={(e) => handlePrecoMilheiroChange(e.target.value)}
                   className="w-full px-4 py-2.5 bg-indigo-50 border-2 border-indigo-400 rounded-xl font-black text-indigo-900 text-lg"
                 />
               </div>
@@ -313,7 +316,7 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
                     step="0.01"
                     min="0"
                     value={precoCaixa}
-                    onChange={(e) => handlePrecoCaixaChange(Number(e.target.value))}
+                    onChange={(e) => handlePrecoCaixaChange(e.target.value)}
                     className="w-32 px-2.5 py-1 text-sm bg-white border border-slate-300 rounded-lg font-bold text-slate-900"
                   />
                   <span className="text-xs text-slate-500 font-medium">({quantidadePorCaixa} un)</span>
@@ -333,7 +336,7 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
                 min="0"
                 max="100"
                 value={aliquotaIpi}
-                onChange={(e) => setAliquotaIpi(Number(e.target.value))}
+                onChange={(e) => setAliquotaIpi(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="Ex: 5.0"
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900"
               />
@@ -348,7 +351,7 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
                 step="0.001"
                 min="0"
                 value={pesoUnitarioKg}
-                onChange={(e) => setPesoUnitarioKg(Number(e.target.value))}
+                onChange={(e) => setPesoUnitarioKg(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="Ex: 12.500"
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900"
               />
