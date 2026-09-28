@@ -519,10 +519,10 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                       <div>Prev: <span className="font-bold font-mono text-slate-700">{p.dataPrevista ? formatDateBR(p.dataPrevista) : '-'}</span></div>
                     </div>
 
-                    {situacao === 'Fechado' && p.status !== 'Cancelado' && (
-                      <div className="flex items-center justify-between rounded-xl bg-purple-50 border border-purple-100 px-3 py-2 text-xs">
-                        <span className="font-bold text-purple-700">Comissão do vendedor</span>
-                        <span className="font-mono font-black text-purple-900">{formatCurrency((p.totalItens || 0) * (p.vendedor?.comissaoPadrao || 5) / 100)}</span>
+                    {p.status !== 'Cancelado' && (
+                      <div className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs border ${situacao === 'Fechado' ? 'bg-purple-50 border-purple-100' : 'bg-amber-50 border-amber-200'}`}>
+                        <span className={`font-bold ${situacao === 'Fechado' ? 'text-purple-700' : 'text-amber-700'}`}>{situacao === 'Fechado' ? 'Comissão do vendedor' : 'Comissão potencial'}</span>
+                        <span className={`font-mono font-black ${situacao === 'Fechado' ? 'text-purple-900' : 'text-amber-800'}`}>{formatCurrency((p.totalItens || 0) * (p.vendedor?.comissaoPadrao || 5) / 100)}</span>
                       </div>
                     )}
 
@@ -743,12 +743,12 @@ export const PedidosList: React.FC<PedidosListProps> = ({
 
                         {/* 7. COMISSÃO */}
                         <td className="py-3 px-4 text-right">
-                          {situacao === 'Fechado' && p.status !== 'Cancelado' ? (
+                          {p.status !== 'Cancelado' ? (
                             <>
-                              <div className="font-mono font-black text-purple-800 text-sm">
+                              <div className={`font-mono font-black text-sm ${situacao === 'Fechado' ? 'text-purple-800' : 'text-amber-700'}`}>
                                 {formatCurrency((p.totalItens || 0) * (p.vendedor?.comissaoPadrao || 5) / 100)}
                               </div>
-                              <div className="text-2xs text-slate-500">{p.vendedor?.comissaoPadrao || 5}% · sem IPI</div>
+                              <div className="text-2xs text-slate-500">{situacao === 'Fechado' ? 'Efetiva' : 'Potencial'} · {p.vendedor?.comissaoPadrao || 5}% · sem IPI</div>
                             </>
                           ) : <span className="text-slate-400">—</span>}
                         </td>
