@@ -1,6 +1,4 @@
 import React, { useState, useRef } from 'react';
-import html2canvas from 'html2canvas-pro';
-import { jsPDF } from 'jspdf';
 import {
   Printer,
   Download,
@@ -38,38 +36,47 @@ export const PedidoPrintView: React.FC<PedidoPrintViewProps> = ({
   const [copiado, setCopiado] = useState(false);
   const documentoRef = useRef<HTMLDivElement>(null);
 
-  // Gera e baixa o PDF diretamente, inclusive no celular.
-  const handleImprimir = async () => {
+  // Abre somente o documento em uma página limpa, preservando exatamente o layout A4.
+  // No celular, o diálogo nativo permite salvar/compartilhar como PDF sem rasterizar o conteúdo.
+  const handleImprimir = () => {
     const documento = documentoRef.current;
     if (!documento) return;
 
-    try {
-      const canvas = await html2canvas(documento, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      });
-
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 6;
-      const maxWidth = pageWidth - margin * 2;
-      const maxHeight = pageHeight - margin * 2;
-      const ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
-      const width = canvas.width * ratio;
-      const height = canvas.height * ratio;
-      const x = (pageWidth - width) / 2;
-      const y = margin;
-
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', x, y, width, height, undefined, 'FAST');
-      const nome = `${pedido.tipo === 'ORCAMENTO' ? 'Orcamento' : 'Pedido'}_${pedido.numero || 'Rascunho'}.pdf`;
-      pdf.save(nome);
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
+    const janela = window.open('', '_blank');
+    if (!janela) {
       window.print();
+      return;
     }
+
+    const estilos = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map((el) => el.outerHTML)
+      .join('\n');
+
+    janela.document.open();
+    janela.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${pedido.tipo === 'ORCAMENTO' ? 'Orçamento' : 'Pedido'}_${pedido.numero}</title>
+${estilos}
+<style>
+@page { size: A4 portrait; margin: 8mm; }
+html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+#documento-impresso { width: 194mm !important; min-width: 194mm !important; max-width: 194mm !important; margin: 0 auto !important; padding: 6mm !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; overflow: visible !important; }
+</style>
+</head>
+<body>${documento.outerHTML}</body>
+</html>`);
+    janela.document.close();
+
+    janela.onload = () => {
+      setTimeout(() => {
+        janela.focus();
+        janela.print();
+      }, 350);
+    };
   };
 
   const handleCopiarTexto = () => {
@@ -127,7 +134,7 @@ ${pedido.observacoes || ''}`;
             className="inline-flex items-center justify-center gap-2.5 px-7 sm:px-9 py-3 text-base font-black text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl shadow-md shadow-indigo-700/20 transition-all cursor-pointer min-h-[48px]"
           >
             <Download className="w-5 h-5 text-indigo-100" />
-            <span>BAIXAR PDF</span>
+            <span>IMPRIMIR / SALVAR PDF</span>
           </button>
         </div>
 
@@ -174,7 +181,7 @@ ${pedido.observacoes || ''}`;
 
       {/* Aviso informativo em telas menores */}
       <div className="no-print block sm:hidden text-center text-xs text-slate-500 font-medium bg-slate-100 py-2 px-3 rounded-lg border border-slate-200">
-        ↔ Deslize para os lados para visualizar a folha completa. O documento é formatado em página A4. Toque em BAIXAR PDF para salvar o arquivo no celular.
+        ↔ Deslize para os lados para visualizar a folha completa. O documento é formatado em página A4. Toque em IMPRIMIR / SALVAR PDF para gerar o PDF mantendo o mesmo layout.
       </div>
 
       {/* DOCUMENTO OFICIAL A4 (Réplica fiel da folha impressa com scroll horizontal no celular) */}
