@@ -27,7 +27,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onSelectTab('relatorios')}
               className="text-xl font-black text-slate-900 hover:opacity-85 transition-opacity cursor-pointer tracking-tight"
             >
-              Gestão de Pedidos
+              <span className="inline-flex items-center gap-2 sm:gap-2.5">
+                <img src="https://i.ibb.co/gFFcS8nn/Logo-DCT-Representac-o-es.png" alt="DCT Representações" className="h-8 sm:h-9 w-auto object-contain" />
+                <span>DCT Gestão de Pedidos</span>
+              </span>
             </button>
 
             <nav className="flex items-center gap-2">
@@ -91,7 +94,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onSelectTab('relatorios')}
               className="text-base font-black text-slate-900 tracking-tight"
             >
-              Gestão de Pedidos
+              <span className="inline-flex items-center gap-2 sm:gap-2.5">
+                <img src="https://i.ibb.co/gFFcS8nn/Logo-DCT-Representac-o-es.png" alt="DCT Representações" className="h-8 sm:h-9 w-auto object-contain" />
+                <span>DCT Gestão de Pedidos</span>
+              </span>
             </button>
 
             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
