@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
+import html2canvas from 'html2canvas-pro';
+import { jsPDF } from 'jspdf';
 import {
   Printer,
-  Share2,
+  Download,
   ArrowLeft,
   Edit3,
   Copy,
@@ -36,78 +38,36 @@ export const PedidoPrintView: React.FC<PedidoPrintViewProps> = ({
   const [copiado, setCopiado] = useState(false);
   const documentoRef = useRef<HTMLDivElement>(null);
 
-  // Impressão limpa com suporte a iframe e diálogo nativo (permite imprimir diretamente ou Salvar como PDF)
-  const handleImprimir = () => {
+  // Gera e baixa o PDF diretamente, inclusive no celular.
+  const handleImprimir = async () => {
+    const documento = documentoRef.current;
+    if (!documento) return;
+
     try {
-      const printContent = documentoRef.current;
-      if (!printContent) {
-        window.print();
-        return;
-      }
+      const canvas = await html2canvas(documento, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
 
-      // Cria um iframe invisível para isolar a impressão dos controles da aplicação
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = '0';
-      document.body.appendChild(iframe);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 6;
+      const maxWidth = pageWidth - margin * 2;
+      const maxHeight = pageHeight - margin * 2;
+      const ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
+      const width = canvas.width * ratio;
+      const height = canvas.height * ratio;
+      const x = (pageWidth - width) / 2;
+      const y = margin;
 
-      const iframeDoc = iframe.contentWindow?.document;
-      if (iframeDoc) {
-        iframeDoc.open();
-        iframeDoc.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>${pedido.tipo === 'ORCAMENTO' ? 'Orçamento' : 'Pedido'}_${pedido.numero}</title>
-              <style>
-                @page { size: A4 portrait; margin: 8mm; }
-                body { 
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                  margin: 0; 
-                  padding: 0; 
-                  background: #ffffff; 
-                  color: #000000; 
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-                * { box-sizing: border-box; }
-                table { width: 100%; border-collapse: collapse; }
-                .print-container { width: 100%; max-width: 210mm; margin: 0 auto; background: #fff; }
-              </style>
-              ${Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-                .map((el) => el.outerHTML)
-                .join('\n')}
-            </head>
-            <body>
-              <div class="print-container">
-                ${printContent.innerHTML}
-              </div>
-            </body>
-          </html>
-        `);
-        iframeDoc.close();
-
-        iframe.contentWindow?.focus();
-        setTimeout(() => {
-          try {
-            iframe.contentWindow?.print();
-          } catch (e) {
-            window.print();
-          }
-          setTimeout(() => {
-            if (document.body.contains(iframe)) {
-              document.body.removeChild(iframe);
-            }
-          }, 1500);
-        }, 300);
-      } else {
-        window.print();
-      }
-    } catch (e) {
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', x, y, width, height, undefined, 'FAST');
+      const nome = `${pedido.tipo === 'ORCAMENTO' ? 'Orcamento' : 'Pedido'}_${pedido.numero || 'Rascunho'}.pdf`;
+      pdf.save(nome);
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
       window.print();
     }
   };
@@ -145,34 +105,6 @@ ${pedido.observacoes || ''}`;
     setTimeout(() => setCopiado(false), 2500);
   };
 
-  const handleEnviarWhatsapp = () => {
-    const numIndustria = pedido.numeroPedidoIndustria;
-    const ocCliente = pedido.ordemCompraCliente || pedido.numeroPedidoCliente;
-    const situacao = pedido.situacaoComercial || 'Enviado';
-    const telefoneLimpo = (pedido.cliente.celular || pedido.cliente.telefone || '').replace(
-      /\D/g,
-      ''
-    );
-    const texto = encodeURIComponent(`Olá ${pedido.cliente.contato || pedido.cliente.razaoSocial}!
-Segue o espelho do ${pedido.tipo === 'ORCAMENTO' ? 'Orçamento' : 'Pedido de Venda'} *${pedido.numero}* [${situacao.toUpperCase()}]${numIndustria ? `\n• Nº Indústria: ${numIndustria}` : ''}${ocCliente ? `\n• Ordem de Compra do Cliente: ${ocCliente}` : ''}:
-
-Empresa: ${pedido.empresaEmissora.nome}
-Vendedor: ${pedido.vendedor.nome}
-Total dos Itens: ${formatCurrency(pedido.totalItens)}
-Total IPI: ${formatCurrency(pedido.totalIpi)}
-*TOTAL GERAL: ${formatCurrency(pedido.totalPedido)}*
-Condição: ${pedido.condicaoPagamento}
-Previsão: ${formatDateBR(pedido.dataPrevista)}
-
-Ficamos à disposição para qualquer esclarecimento!`);
-
-    const url = telefoneLimpo
-      ? `https://api.whatsapp.com/send?phone=55${telefoneLimpo}&text=${texto}`
-      : `https://api.whatsapp.com/send?text=${texto}`;
-
-    window.open(url, '_blank');
-  };
-
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Barra de Ações Superior (Oculta na Impressão) */}
@@ -194,8 +126,8 @@ Ficamos à disposição para qualquer esclarecimento!`);
             onClick={handleImprimir}
             className="inline-flex items-center justify-center gap-2.5 px-7 sm:px-9 py-3 text-base font-black text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl shadow-md shadow-indigo-700/20 transition-all cursor-pointer min-h-[48px]"
           >
-            <Printer className="w-5 h-5 text-indigo-100" />
-            <span>IMPRIMIR</span>
+            <Download className="w-5 h-5 text-indigo-100" />
+            <span>BAIXAR PDF</span>
           </button>
         </div>
 
@@ -236,20 +168,13 @@ Ficamos à disposição para qualquer esclarecimento!`);
             <span>{copiado ? 'Copiado!' : 'Copiar resumo'}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleEnviarWhatsapp}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-300 rounded-xl transition-colors cursor-pointer min-h-[40px]"
-          >
-            <Share2 className="w-4 h-4" />
-            <span>Texto WhatsApp</span>
-          </button>
+
         </div>
       </div>
 
       {/* Aviso informativo em telas menores */}
       <div className="no-print block sm:hidden text-center text-xs text-slate-500 font-medium bg-slate-100 py-2 px-3 rounded-lg border border-slate-200">
-        ↔ Deslize para os lados para visualizar a folha completa. O documento é formatado em página A4 oficial para impressão direta ou salvar como PDF.
+        ↔ Deslize para os lados para visualizar a folha completa. O documento é formatado em página A4. Toque em BAIXAR PDF para salvar o arquivo no celular.
       </div>
 
       {/* DOCUMENTO OFICIAL A4 (Réplica fiel da folha impressa com scroll horizontal no celular) */}
