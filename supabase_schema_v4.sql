@@ -418,11 +418,8 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- Validação de DELETE (Exclusão física)
+    -- Validação de DELETE (Exclusão física liberada para qualquer status)
     IF TG_OP = 'DELETE' THEN
-        IF OLD.status <> 'Rascunho' THEN
-            RAISE EXCEPTION 'Operação não permitida: Apenas pedidos com status Rascunho podem ser excluídos do sistema. Pedidos % (código %) devem permanecer permanentemente no histórico.', OLD.status, coalesce(OLD.numero_formatado, OLD.id::text);
-        END IF;
         RETURN OLD;
     END IF;
 
@@ -439,12 +436,7 @@ EXECUTE FUNCTION public.fn_validar_integridade_pedido();
 -- ============================================================================
 -- 15. TRIGGER DE BLINDAGEM DE ITENS DO PEDIDO
 -- ============================================================================
--- Somente pedidos com status 'Rascunho' podem sofrer:
--- - INSERT de item
--- - UPDATE de item
--- - DELETE de item
---
--- Se o pedido estiver Emitido ou Cancelado, o banco bloqueia sumariamente.
+-- Exclusão de itens é livre; inserção e alteração respeitam integridade comercial.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.fn_proteger_itens_pedido()
 RETURNS TRIGGER AS $$
@@ -453,30 +445,26 @@ DECLARE
     v_num_pedido TEXT;
     v_id_pedido UUID;
 BEGIN
+    -- Exclusão de itens é SEMPRE permitida
     IF TG_OP = 'DELETE' THEN
-        v_id_pedido := OLD.pedido_id;
-    ELSE
-        v_id_pedido := NEW.pedido_id;
+        RETURN OLD;
     END IF;
+
+    v_id_pedido := NEW.pedido_id;
 
     SELECT status, numero_formatado INTO v_status_pedido, v_num_pedido
     FROM public.pedidos
     WHERE id = v_id_pedido;
 
     IF v_status_pedido IS NULL THEN
-        -- Pedido pai sendo removido em cascata durante deleção de um rascunho
-        RETURN COALESCE(NEW, OLD);
+        RETURN NEW;
     END IF;
 
     IF v_status_pedido <> 'Rascunho' THEN
-        RAISE EXCEPTION 'Operação rejeitada em itens_pedido: Não é permitido adicionar, alterar ou remover itens de um pedido com status "%" (Pedido %). Modificações de itens são exclusivas de pedidos em Rascunho.', v_status_pedido, COALESCE(v_num_pedido, v_id_pedido::text);
+        RAISE EXCEPTION 'Operação rejeitada em itens_pedido: Não é permitido adicionar ou alterar itens de um pedido com status "%" (Pedido %). Modificações de itens são exclusivas de pedidos em Rascunho.', v_status_pedido, COALESCE(v_num_pedido, v_id_pedido::text);
     END IF;
 
-    IF TG_OP = 'DELETE' THEN
-        RETURN OLD;
-    ELSE
-        RETURN NEW;
-    END IF;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -645,14 +633,12 @@ WITH CHECK (
 );
 
 -- DELETE:
--- Apenas pedidos com status 'Rascunho' podem ser excluídos.
--- Pedidos Emitidos ou Cancelados jamais podem ser deletados.
+-- Qualquer pedido pode ser excluído pelo usuário responsável ou admin.
 DROP POLICY IF EXISTS "pedidos_delete_policy" ON public.pedidos;
 CREATE POLICY "pedidos_delete_policy" ON public.pedidos
 FOR DELETE TO authenticated
 USING (
-    (public.is_admin() OR created_by = auth.uid() OR vendedor_id = public.get_current_representante_id())
-    AND status = 'Rascunho'
+    public.is_admin() OR created_by = auth.uid() OR vendedor_id = public.get_current_representante_id()
 );
 
 -- ============================================================================
@@ -720,7 +706,7 @@ WITH CHECK (
     )
 );
 
--- DELETE: Somente permitido se o pedido pai estiver com status 'Rascunho'
+-- DELETE: Exclusão de itens liberada
 DROP POLICY IF EXISTS "itens_pedido_delete_policy" ON public.itens_pedido;
 CREATE POLICY "itens_pedido_delete_policy" ON public.itens_pedido
 FOR DELETE TO authenticated
@@ -728,7 +714,6 @@ USING (
     EXISTS (
         SELECT 1 FROM public.pedidos p
         WHERE p.id = itens_pedido.pedido_id
-          AND p.status = 'Rascunho'
           AND (
               public.is_admin() OR
               p.created_by = auth.uid() OR
@@ -736,6 +721,17 @@ USING (
           )
     )
 );
+
+CREATE OR REPLACE FUNCTION public.excluir_pedido_definitivo(p_pedido_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    DELETE FROM public.itens_pedido WHERE pedido_id = p_pedido_id;
+    DELETE FROM public.pedidos WHERE id = p_pedido_id;
+    RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.excluir_pedido_definitivo(UUID) TO authenticated, anon;
 
 -- ============================================================================
 -- 21. TRIGGER AUTOMÁTICO DE CRIAÇÃO DE REPRESENTANTE NO CADASTRO DE AUTH

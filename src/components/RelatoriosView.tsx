@@ -19,6 +19,7 @@ import { PedidosList } from './PedidosList';
 
 interface RelatoriosViewProps {
   pedidos: Pedido[];
+  pedidosLixeira?: Pedido[];
   vendedores: Representante[];
   representadas: Representada[];
   onNovoPedido: (tipo: TipoDocumento) => void;
@@ -28,10 +29,14 @@ interface RelatoriosViewProps {
   onExcluir: (id: string) => void;
   onCancelar?: (id: string) => void;
   onToggleSituacaoComercial?: (id: string) => void;
+  onRestaurarPedido?: (id: string) => void;
+  onEsvaziarLixeira?: () => void;
+  onExcluirDefinitivoLixeira?: (id: string) => void;
 }
 
 export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   pedidos,
+  pedidosLixeira = [],
   vendedores,
   representadas,
   onNovoPedido,
@@ -41,6 +46,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   onExcluir,
   onCancelar,
   onToggleSituacaoComercial,
+  onRestaurarPedido,
+  onEsvaziarLixeira,
+  onExcluirDefinitivoLixeira,
 }) => {
   // Sub-abas internas para organização limpa e desktop-first
   const [subAba, setSubAba] = useState<'pedidos' | 'visaoGeral' | 'comissoes' | 'marcas'>(
@@ -346,6 +354,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       {subAba === 'pedidos' && (
         <PedidosList
           pedidos={pedidos}
+          pedidosLixeira={pedidosLixeira}
           vendedores={vendedores}
           onNovoPedido={onNovoPedido}
           onVisualizar={onVisualizar}
@@ -354,6 +363,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           onExcluir={onExcluir}
           onCancelar={onCancelar}
           onToggleSituacaoComercial={onToggleSituacaoComercial}
+          onRestaurarPedido={onRestaurarPedido}
+          onEsvaziarLixeira={onEsvaziarLixeira}
+          onExcluirDefinitivoLixeira={onExcluirDefinitivoLixeira}
         />
       )}
 

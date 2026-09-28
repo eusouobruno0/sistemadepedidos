@@ -26,6 +26,8 @@ const KEYS = {
   VENDEDORES: 'gestao_pedidos_vendedores_v1',
   CONDICOES: 'gestao_pedidos_condicoes_v1',
   PEDIDOS: 'gestao_pedidos_pedidos_v1',
+  LIXEIRA: 'gestao_pedidos_lixeira_v1',
+  EXCLUIDOS_IDS: 'gestao_pedidos_excluidos_ids_v1',
   EMPRESA_PADRAO: 'gestao_pedidos_empresa_padrao_v1',
   SEQ_CLIENTE: 'gestao_pedidos_seq_cliente_v1',
   SEQ_PRODUTO: 'gestao_pedidos_seq_produto_v1',
@@ -488,6 +490,75 @@ export const StorageService = {
     const updated = list.filter((p) => p.id !== id);
     this.savePedidos(updated);
     return updated;
+  },
+
+  getExcluidosIds(): string[] {
+    const ids = getItem<string[]>(KEYS.EXCLUIDOS_IDS, []);
+    return Array.isArray(ids) ? ids : [];
+  },
+
+  addExcluidoId(id: string): void {
+    if (!id) return;
+    const ids = this.getExcluidosIds();
+    if (!ids.includes(id)) {
+      setItem(KEYS.EXCLUIDOS_IDS, [...ids, id]);
+    }
+  },
+
+  removeExcluidoId(id: string): void {
+    const ids = this.getExcluidosIds();
+    setItem(KEYS.EXCLUIDOS_IDS, ids.filter((item) => item !== id));
+  },
+
+  isExcluido(id: string): boolean {
+    return this.getExcluidosIds().includes(id);
+  },
+
+  getLixeira(): Pedido[] {
+    const data = getItem<Pedido[]>(KEYS.LIXEIRA, []);
+    return Array.isArray(data) ? data : [];
+  },
+
+  saveLixeira(list: Pedido[]): void {
+    setItem(KEYS.LIXEIRA, list);
+  },
+
+  moverParaLixeira(pedido: Pedido): Pedido[] {
+    this.addExcluidoId(pedido.id);
+    const lixeira = this.getLixeira();
+    const lixeiraAtualizada = [
+      { ...pedido, dataExclusao: new Date().toISOString() },
+      ...lixeira.filter((p) => p.id !== pedido.id),
+    ];
+    this.saveLixeira(lixeiraAtualizada);
+    return this.deletePedido(pedido.id);
+  },
+
+  restaurarDaLixeira(id: string): Pedido | null {
+    const lixeira = this.getLixeira();
+    const pedido = lixeira.find((p) => p.id === id);
+    if (!pedido) return null;
+
+    // Remove da lixeira e da lista de excluídos
+    this.removeExcluidoId(id);
+    const lixeiraRestante = lixeira.filter((p) => p.id !== id);
+    this.saveLixeira(lixeiraRestante);
+
+    // Salva de volta nos pedidos ativos locais
+    const pedidos = this.getPedidos();
+    const semExclusao = { ...pedido };
+    delete (semExclusao as any).dataExclusao;
+    this.savePedidos([semExclusao, ...pedidos.filter((p) => p.id !== id)]);
+    return semExclusao;
+  },
+
+  excluirDefinitivoLixeira(id: string): void {
+    const lixeira = this.getLixeira();
+    this.saveLixeira(lixeira.filter((p) => p.id !== id));
+  },
+
+  esvaziarLixeira(): void {
+    this.saveLixeira([]);
   },
 
   resetAll(): void {

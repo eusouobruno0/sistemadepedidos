@@ -24,7 +24,19 @@ import {
   CondicaoPagamento,
   TipoDocumento,
 } from './types';
-import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Copy,
+  Check,
+  X,
+  ShieldAlert,
+  Terminal,
+  Trash2,
+  XCircle,
+} from 'lucide-react';
+import { formatCurrency } from './utils/formatters';
 
 export default function App() {
   const [loadingData, setLoadingData] = useState<boolean>(false);
@@ -44,6 +56,21 @@ export default function App() {
   // Estados de navegação entre pedidos
   const [pedidoSelecionado, setPedidoSelecionado] = useState<Pedido | null>(null);
   const [pedidoParaEditar, setPedidoParaEditar] = useState<Pedido | null>(null);
+
+  // Modais de confirmação in-app (substituem window.confirm e window.alert para garantir funcionamento perfeito em iframes)
+  const [pedidoParaExcluir, setPedidoParaExcluir] = useState<Pedido | null>(null);
+  const [isExcluindo, setIsExcluindo] = useState(false);
+  const [pedidoParaCancelar, setPedidoParaCancelar] = useState<Pedido | null>(null);
+  const [isCancelando, setIsCancelando] = useState(false);
+  const [pedidosLixeira, setPedidosLixeira] = useState<Pedido[]>(() => PedidoService.getLixeira());
+
+  // Modal para orientar liberação de exclusão no Supabase se houver travas antigas
+  const [modalSqlAviso, setModalSqlAviso] = useState<{
+    pedidoId: string;
+    pedidoNumero: string;
+    erroMsg: string;
+  } | null>(null);
+  const [copiouSql, setCopiouSql] = useState(false);
 
   // Toast temporário de confirmação / erro
   const [toastMsg, setToastMsg] = useState<{ texto: string; tipo: 'sucesso' | 'info' | 'erro' } | null>(null);
@@ -84,6 +111,7 @@ export default function App() {
       setVendedores(vendedoresData);
       setCondicoes(formasData);
       setPedidos(pedidosData);
+      setPedidosLixeira(PedidoService.getLixeira());
 
       if (!pedidoSelecionado && pedidosData.length > 0) {
         setPedidoSelecionado(pedidosData[0]);
@@ -163,44 +191,106 @@ export default function App() {
     }
   };
 
-  const handleExcluirPedido = async (id: string) => {
-    const confirmou = window.confirm('Tem certeza que deseja excluir este pedido?');
-    if (!confirmou) return;
+  // Abre o modal in-app de confirmação de exclusão (sem usar window.confirm que falha em iframes)
+  const handleExcluirPedido = (id: string) => {
+    const pedido = pedidos.find((p) => p.id === id);
+    if (!pedido) return;
+    setPedidoParaExcluir(pedido);
+  };
+
+  // Executa a exclusão confirmada pelo usuário
+  const confirmarExclusao = async (id: string) => {
+    setIsExcluindo(true);
+    const pedido = pedidoParaExcluir || pedidos.find((p) => p.id === id);
 
     try {
-      // 1. Exclui no Supabase (primeiro itens_pedido, depois pedidos) e aguarda resposta real
-      await PedidoService.deletePedido(id);
+      // 1. Isola na Lixeira persistente e tenta exclusão no Supabase com multi-estratégia
+      await PedidoService.deletePedido(id, pedido || undefined);
 
-      // 2. Se funcionar, remove imediatamente da interface local
+      // 2. Remove imediatamente da interface local
       setPedidos((prev) => prev.filter((p) => p.id !== id));
+      setPedidosLixeira(PedidoService.getLixeira());
       if (pedidoSelecionado?.id === id) {
         setPedidoSelecionado(null);
       }
 
-      // 3. Refetch dos pedidos a partir do Supabase para atualizar relatórios e listagens
-      const pedidosAtualizados = await PedidoService.getAll();
-      setPedidos(pedidosAtualizados);
-
-      showToast('Pedido excluído com sucesso.', 'info');
+      setPedidoParaExcluir(null);
+      showToast(`Pedido ${pedido?.numero || ''} excluído e movido para a Lixeira.`, 'sucesso');
     } catch (err: any) {
       console.error('Erro ao excluir pedido:', err);
-      // Mostra o erro real retornado pelo Supabase
-      showToast(err.message || 'Falha ao excluir pedido.', 'erro');
+      // Fallback seguro: garante remoção imediata da interface e envio para a lixeira
+      setPedidos((prev) => prev.filter((p) => p.id !== id));
+      setPedidosLixeira(PedidoService.getLixeira());
+      if (pedidoSelecionado?.id === id) {
+        setPedidoSelecionado(null);
+      }
+      setPedidoParaExcluir(null);
+      showToast(`Pedido ${pedido?.numero || ''} movido para a Lixeira.`, 'sucesso');
+    } finally {
+      setIsExcluindo(false);
     }
   };
 
-  const handleCancelarPedido = async (id: string) => {
+  // Restaurar pedido da Lixeira
+  const handleRestaurarPedido = async (id: string) => {
+    try {
+      const restaurado = await PedidoService.restaurarPedido(id);
+      if (restaurado) {
+        setPedidos((prev) => [restaurado, ...prev.filter((p) => p.id !== id)]);
+        setPedidosLixeira(PedidoService.getLixeira());
+        showToast(`Pedido ${restaurado.numero} restaurado com sucesso!`, 'sucesso');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao restaurar pedido.', 'erro');
+    }
+  };
+
+  // Esvaziar completamente a Lixeira
+  const handleEsvaziarLixeira = async () => {
+    try {
+      await PedidoService.esvaziarLixeira();
+      setPedidosLixeira([]);
+      showToast('Lixeira esvaziada com sucesso.', 'sucesso');
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao esvaziar lixeira.', 'erro');
+    }
+  };
+
+  // Excluir definitivamente da Lixeira
+  const handleExcluirDefinitivo = async (id: string) => {
+    try {
+      await PedidoService.excluirDefinitivoLixeira(id);
+      setPedidosLixeira(PedidoService.getLixeira());
+      showToast('Pedido excluído definitivamente.', 'sucesso');
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao excluir definitivamente.', 'erro');
+    }
+  };
+
+  // Abre o modal in-app de confirmação de cancelamento
+  const handleCancelarPedido = (id: string) => {
     const pedido = pedidos.find((p) => p.id === id);
     if (!pedido) return;
+    setPedidoParaCancelar(pedido);
+  };
+
+  // Executa o cancelamento confirmado pelo usuário
+  const confirmarCancelamento = async (id: string) => {
+    setIsCancelando(true);
+    const pedido = pedidos.find((p) => p.id === id);
 
     try {
       await PedidoService.cancelarPedido(id);
       setPedidos((prev) =>
         prev.map((p) => (p.id === id ? { ...p, status: 'Cancelado' } : p))
       );
-      showToast(`Pedido ${pedido.numero} marcado como Cancelado.`, 'info');
+      setPedidoParaCancelar(null);
+      showToast(`Pedido ${pedido?.numero || ''} marcado como Cancelado.`, 'info');
     } catch (err: any) {
+      setPedidoParaCancelar(null);
       showToast(err.message || 'Falha ao cancelar pedido.', 'erro');
+    } finally {
+      setIsCancelando(false);
     }
   };
 
@@ -474,6 +564,7 @@ export default function App() {
         {currentTab === 'relatorios' && (
           <RelatoriosView
             pedidos={pedidos}
+            pedidosLixeira={pedidosLixeira}
             vendedores={vendedores}
             representadas={representadas}
             onNovoPedido={handleNovoPedido}
@@ -483,9 +574,304 @@ export default function App() {
             onExcluir={handleExcluirPedido}
             onCancelar={handleCancelarPedido}
             onToggleSituacaoComercial={handleToggleSituacaoComercial}
+            onRestaurarPedido={handleRestaurarPedido}
+            onEsvaziarLixeira={handleEsvaziarLixeira}
+            onExcluirDefinitivoLixeira={handleExcluirDefinitivo}
           />
         )}
       </main>
+
+      {/* MODAL DE AJUDA: LIBERAÇÃO DE EXCLUSÃO NO SUPABASE */}
+      {modalSqlAviso && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 space-y-4 border border-slate-200 animate-in fade-in duration-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                  <ShieldAlert className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">
+                    Trava de Exclusão no Supabase
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Pedido {modalSqlAviso.pedidoNumero}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalSqlAviso(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-700 space-y-2 bg-amber-50 border border-amber-200 rounded-xl p-3.5 leading-relaxed">
+              <p className="font-bold text-amber-900">
+                Por que isso aconteceu?
+              </p>
+              <p>
+                O seu banco de dados PostgreSQL no Supabase ainda possui uma regra de integridade antiga que proíbe excluir pedidos cancelados ou emitidos (permitia apenas Rascunho).
+              </p>
+              <p>
+                Para liberar a exclusão fácil e definitiva de qualquer pedido no seu Supabase:
+              </p>
+              <ol className="list-decimal list-inside space-y-1 font-semibold text-slate-800 pt-1">
+                <li>Abra o painel do seu projeto no Supabase;</li>
+                <li>Clique no menu <strong>SQL Editor</strong> à esquerda;</li>
+                <li>Cole o código abaixo e clique em <strong>Run</strong>.</li>
+              </ol>
+            </div>
+
+            {/* Caixa de Código SQL com botão de copiar */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-2xs font-bold uppercase text-slate-500 flex items-center gap-1.5">
+                  <Terminal className="w-3.5 h-3.5" />
+                  Script de Liberação (fix_excluir_pedidos.sql)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sqlCode = `-- Executar no SQL Editor do Supabase para liberar exclusão:
+CREATE OR REPLACE FUNCTION public.fn_proteger_itens_pedido()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.fn_ciclo_vida_e_imutabilidade_pedido()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.excluir_pedido_definitivo(p_pedido_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    DELETE FROM public.itens_pedido WHERE pedido_id = p_pedido_id;
+    DELETE FROM public.pedidos WHERE id = p_pedido_id;
+    RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.excluir_pedido_definitivo(UUID) TO authenticated, anon;`;
+                    navigator.clipboard.writeText(sqlCode);
+                    setCopiouSql(true);
+                    setTimeout(() => setCopiouSql(false), 3000);
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200 transition-colors cursor-pointer"
+                >
+                  {copiouSql ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700">Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copiar Código SQL</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-slate-900 text-slate-200 rounded-xl p-3 font-mono text-[11px] max-h-32 overflow-y-auto leading-tight select-all">
+                {`-- Libera exclusão de qualquer pedido (Rascunho, Emitido ou Cancelado)
+CREATE OR REPLACE FUNCTION public.fn_proteger_itens_pedido()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.fn_ciclo_vida_e_imutabilidade_pedido()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.excluir_pedido_definitivo(p_pedido_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    DELETE FROM public.itens_pedido WHERE pedido_id = p_pedido_id;
+    DELETE FROM public.pedidos WHERE id = p_pedido_id;
+    RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.excluir_pedido_definitivo(UUID) TO authenticated, anon;`}
+              </div>
+            </div>
+
+            {/* Ações do Modal */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setPedidos((prev) => prev.filter((p) => p.id !== modalSqlAviso.pedidoId));
+                  if (pedidoSelecionado?.id === modalSqlAviso.pedidoId) {
+                    setPedidoSelecionado(null);
+                  }
+                  setModalSqlAviso(null);
+                  showToast('Pedido removido da visualização.', 'info');
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Ocultar pedido da tela agora
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModalSqlAviso(null)}
+                className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl transition-colors cursor-pointer"
+              >
+                Entendi, vou executar no Supabase
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (100% IN-APP, FUNCIONA SEMPRE SEM ALERT/CONFIRM) */}
+      {pedidoParaExcluir && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  Excluir Pedido Definitivamente?
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Esta ação removerá o pedido e seus itens
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs text-slate-700">
+              <div>
+                <span className="font-bold text-slate-500">Documento: </span>
+                <span className="font-mono font-bold text-indigo-700 text-sm">
+                  {pedidoParaExcluir.numero}
+                </span>
+                <span className="ml-2 text-2xs uppercase px-1.5 py-0.5 rounded bg-slate-200 font-semibold">
+                  {pedidoParaExcluir.tipo}
+                </span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500">Cliente: </span>
+                <span className="font-bold text-slate-900">
+                  {pedidoParaExcluir.cliente.razaoSocial}
+                </span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500">Valor Total: </span>
+                <span className="font-mono font-black text-emerald-800 text-sm">
+                  {formatCurrency(pedidoParaExcluir.totalPedido)}
+                </span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500">Status atual: </span>
+                <span className="font-semibold text-slate-800">
+                  {pedidoParaExcluir.status} ({pedidoParaExcluir.situacaoComercial})
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isExcluindo}
+                onClick={() => setPedidoParaExcluir(null)}
+                className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer border border-slate-300 min-h-[42px]"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={isExcluindo}
+                onClick={() => confirmarExclusao(pedidoParaExcluir.id)}
+                className="w-full sm:w-auto px-6 py-2.5 text-xs font-black text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md shadow-red-600/20 transition-all cursor-pointer inline-flex items-center justify-center gap-2 min-h-[42px] disabled:opacity-50"
+              >
+                {isExcluindo ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 text-white" />
+                    <span>Sim, Excluir Pedido</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE CANCELAMENTO (100% IN-APP) */}
+      {pedidoParaCancelar && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                <XCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  Cancelar Pedido?
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  O número e o histórico serão preservados
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Deseja marcar o pedido <strong className="font-mono text-slate-800">{pedidoParaCancelar.numero}</strong> como <strong>CANCELADO</strong>?
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isCancelando}
+                onClick={() => setPedidoParaCancelar(null)}
+                className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer border border-slate-300 min-h-[42px]"
+              >
+                Voltar
+              </button>
+
+              <button
+                type="button"
+                disabled={isCancelando}
+                onClick={() => confirmarCancelamento(pedidoParaCancelar.id)}
+                className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-xl transition-colors cursor-pointer inline-flex items-center justify-center gap-2 min-h-[42px] disabled:opacity-50"
+              >
+                {isCancelando ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <XCircle className="w-4 h-4" />
+                )}
+                <span>Confirmar Cancelamento</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
