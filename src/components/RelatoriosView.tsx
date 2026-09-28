@@ -582,6 +582,17 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             </div>
           </div>
 
+          {/* Comissão potencial dos pedidos enviados */}
+          <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="text-2xs font-bold text-amber-700 uppercase tracking-wider">Comissão potencial</div>
+              <div className="text-xs text-amber-800 mt-1">Valor estimado se os pedidos enviados forem fechados.</div>
+            </div>
+            <div className="text-2xl font-black font-mono text-amber-800">
+              {formatCurrency(pedidosEnviadosPipeline.reduce((acc, p) => acc + ((p.totalItens || 0) * (p.vendedor?.comissaoPadrao || 5) / 100), 0))}
+            </div>
+          </div>
+
           {/* Resumo geral */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
@@ -630,7 +641,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50/60">
               <h3 className="font-black text-sm text-slate-900">Comissão por pedido</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Detalhamento dos pedidos fechados no período selecionado.</p>
+              <p className="text-xs text-slate-500 mt-0.5">Pedidos fechados mostram comissão efetiva; enviados mostram comissão potencial.</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
@@ -638,7 +649,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   <th className="py-3 px-4">Pedido</th><th className="py-3 px-4">Data</th><th className="py-3 px-4">Cliente</th><th className="py-3 px-4">Vendedor</th><th className="py-3 px-4 text-right">Base sem IPI</th><th className="py-3 px-3 text-center">%</th><th className="py-3 px-4 text-right text-purple-700">Comissão</th>
                 </tr></thead>
                 <tbody className="divide-y divide-slate-100">
-                  {pedidosFechadosEfetivos.map((p) => {
+                  {[...pedidosFechadosEfetivos, ...pedidosEnviadosPipeline].map((p) => {
                     const taxa = p.vendedor.comissaoPadrao || 5;
                     const comissao = (p.totalItens || 0) * taxa / 100;
                     return <tr key={p.id} className="hover:bg-slate-50">
@@ -648,10 +659,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                       <td className="py-3 px-4">{p.vendedor.nome}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold">{formatCurrency(p.totalItens || 0)}</td>
                       <td className="py-3 px-3 text-center font-mono">{taxa}%</td>
-                      <td className="py-3 px-4 text-right font-mono font-black text-purple-800">{formatCurrency(comissao)}</td>
+                      <td className={`py-3 px-4 text-right font-mono font-black ${p.situacaoComercial === 'Fechado' ? 'text-purple-800' : 'text-amber-700'}`}><div>{formatCurrency(comissao)}</div><div className="text-[10px] font-sans font-bold uppercase">{p.situacaoComercial === 'Fechado' ? 'Efetiva' : 'Potencial'}</div></td>
                     </tr>;
                   })}
-                  {pedidosFechadosEfetivos.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-400">Nenhum pedido fechado encontrado neste período.</td></tr>}
+                  {pedidosFechadosEfetivos.length === 0 && pedidosEnviadosPipeline.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-400">Nenhum pedido encontrado neste período.</td></tr>}
                 </tbody>
               </table>
             </div>
