@@ -519,6 +519,13 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                       <div>Prev: <span className="font-bold font-mono text-slate-700">{p.dataPrevista ? formatDateBR(p.dataPrevista) : '-'}</span></div>
                     </div>
 
+                    {situacao === 'Fechado' && p.status !== 'Cancelado' && (
+                      <div className="flex items-center justify-between rounded-xl bg-purple-50 border border-purple-100 px-3 py-2 text-xs">
+                        <span className="font-bold text-purple-700">Comissão do vendedor</span>
+                        <span className="font-mono font-black text-purple-900">{formatCurrency((p.totalItens || 0) * (p.vendedor?.comissaoPadrao || 5) / 100)}</span>
+                      </div>
+                    )}
+
                     {/* Barra de Ações com botões confortáveis */}
                     <div className="pt-2 border-t border-slate-100">
                       {modoVisualizacao === 'lixeira' ? (
@@ -603,6 +610,7 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                     <th className="py-3 px-4">Vendedor & Pagamento</th>
                     <th className="py-3 px-4 text-center">Data Real / Prev.</th>
                     <th className="py-3 px-4 text-right">Valor Total</th>
+                    <th className="py-3 px-4 text-right">Comissão</th>
                     <th className="py-3 px-4 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -733,7 +741,19 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                           )}
                         </td>
 
-                        {/* 7. AÇÕES */}
+                        {/* 7. COMISSÃO */}
+                        <td className="py-3 px-4 text-right">
+                          {situacao === 'Fechado' && p.status !== 'Cancelado' ? (
+                            <>
+                              <div className="font-mono font-black text-purple-800 text-sm">
+                                {formatCurrency((p.totalItens || 0) * (p.vendedor?.comissaoPadrao || 5) / 100)}
+                              </div>
+                              <div className="text-2xs text-slate-500">{p.vendedor?.comissaoPadrao || 5}% · sem IPI</div>
+                            </>
+                          ) : <span className="text-slate-400">—</span>}
+                        </td>
+
+                        {/* 8. AÇÕES */}
                         <td className="py-3 px-4 text-right">
                           {modoVisualizacao === 'lixeira' ? (
                             <div className="flex items-center justify-end gap-1.5">
