@@ -544,15 +544,15 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                           </button>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <button
                             type="button"
                             onClick={() => onVisualizar(p)}
-                            className="col-span-2 py-2 px-3 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl flex items-center justify-center gap-1.5 min-h-[42px] cursor-pointer"
-                            title="Visualizar e Baixar PDF"
+                            className="py-2 px-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl flex items-center justify-center gap-1.5 min-h-[42px] cursor-pointer"
+                            title="Visualizar e Imprimir pedido"
                           >
                             <Printer className="w-3.5 h-3.5" />
-                            <span>Ver / PDF</span>
+                            <span>Imprimir</span>
                           </button>
 
                           <button
@@ -567,11 +567,22 @@ export const PedidosList: React.FC<PedidosListProps> = ({
 
                           <button
                             type="button"
+                            onClick={() => onDuplicar(p)}
+                            className="py-2 px-2 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl flex items-center justify-center gap-1 min-h-[42px] cursor-pointer"
+                            title="Duplicar pedido com próximo número sequencial oficial"
+                          >
+                            <Copy className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Duplicar</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => onExcluir(p.id)}
                             className="py-2 px-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl flex items-center justify-center gap-1 min-h-[42px] cursor-pointer"
                             title="Excluir pedido / Mover para lixeira"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                            <span>Excluir</span>
                           </button>
                         </div>
                       )}
@@ -751,7 +762,7 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                                 type="button"
                                 onClick={() => onVisualizar(p)}
                                 className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                                title="Visualizar pedido"
+                                title="Visualizar e Imprimir pedido"
                               >
                                 <Printer className="w-4 h-4" />
                               </button>
@@ -767,7 +778,7 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                                 type="button"
                                 onClick={() => onDuplicar(p)}
                                 className="p-1.5 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
-                                title="Duplicar pedido"
+                                title="Duplicar pedido com próximo número sequencial oficial"
                               >
                                 <Copy className="w-4 h-4" />
                               </button>

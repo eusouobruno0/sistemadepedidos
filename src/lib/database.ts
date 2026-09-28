@@ -957,9 +957,16 @@ export const PedidoService = {
       }
     }
 
+    // Determinação do status:
+    // Se for novo pedido, cria como Rascunho para aguardar emissão.
+    // Se for atualização de pedido existente, PRESERVA o status atual do pedido (ex: 'Emitido' ou 'Aprovado').
+    const statusFinal = isNew
+      ? 'Rascunho'
+      : (pedido.status && pedido.status !== 'Rascunho' ? pedido.status : 'Emitido');
+
     const pedidoPayload: any = {
       tipo: pedido.tipo || 'PEDIDO',
-      status: 'Rascunho', // Sempre salvo como Rascunho inicialmente
+      status: statusFinal,
       situacao_comercial: pedido.situacaoComercial || 'Enviado',
       data_prevista: pedido.dataPrevista || null,
       numero_pedido_industria: pedido.numeroPedidoIndustria?.trim() || null,
@@ -982,7 +989,15 @@ export const PedidoService = {
       peso_total_kg: pedido.pesoTotalKg || 0,
       programado: Boolean(pedido.programado),
       observacoes: pedido.observacoes?.trim() || null,
+      updated_at: new Date().toISOString(),
     };
+
+    if (!isNew && pedido.numero && pedido.numero !== 'RASCUNHO') {
+      pedidoPayload.numero_formatado = pedido.numero;
+      if (pedido.numeroSequencial) {
+        pedidoPayload.numero_sequencial = pedido.numeroSequencial;
+      }
+    }
 
     let pedidoSalvoRow: any;
 
@@ -1001,7 +1016,19 @@ export const PedidoService = {
         .eq('id', pedido.id)
         .select()
         .single();
-      if (error) throw new Error(`Erro ao atualizar pedido: ${error.message}`);
+      if (error) {
+        if (
+          error.message.includes('dados comerciais congelados') ||
+          error.message.includes('Não é permitido reverter') ||
+          error.message.includes('imutabilidade')
+        ) {
+          StorageService.savePedido(pedido);
+          throw new Error(
+            `Trava de imutabilidade no Supabase: ${error.message}. Execute o script fix_permitir_editar_pedidos.sql no SQL Editor do Supabase para destravar a edição de pedidos emitidos.`
+          );
+        }
+        throw new Error(`Erro ao atualizar pedido: ${error.message}`);
+      }
       pedidoSalvoRow = data;
     }
 
@@ -1149,6 +1176,74 @@ export const PedidoService = {
   },
 
   /**
+   * ATUALIZAÇÃO DE PEDIDO EXISTENTE:
+   * Permite editar qualquer campo comercial (condição de pagamento, prazos, cliente, itens, etc.)
+   * Preservando rigorosamente o número oficial do pedido (ex: PED000003) e o status Emitido.
+   */
+  async atualizarPedido(
+    pedido: Pedido,
+    formaPagamentoId?: string
+  ): Promise<Pedido> {
+    if (!pedido.id) {
+      throw new Error('ID do pedido ausente para atualização.');
+    }
+
+    // Salva mantendo o status do pedido (se já era Emitido, continua Emitido)
+    const statusMantido = pedido.status && pedido.status !== 'Rascunho' ? pedido.status : 'Emitido';
+    const pedidoParaSalvar: Pedido = {
+      ...pedido,
+      status: statusMantido,
+    };
+
+    const pedidoAtualizado = await this.saveDraft(pedidoParaSalvar, formaPagamentoId);
+
+    // Atualiza imediatamente o storage local para sincronismo instantâneo
+    StorageService.savePedido(pedidoAtualizado);
+    return pedidoAtualizado;
+  },
+
+  /**
+   * DUPLICAÇÃO DE PEDIDO:
+   * Cria uma cópia exata do pedido (cliente, representada, vendedor, produtos, prazos, etc.),
+   * mas com ID limpo, data atual e consome o PRÓXIMO NÚMERO SEQUENCIAL oficial (ex: se era PED000003 e o próximo é 5, gera PED000005).
+   */
+  async duplicarPedido(
+    pedidoOriginal: Pedido,
+    formaPagamentoId?: string
+  ): Promise<Pedido> {
+    const itensCopiados = (pedidoOriginal.itens || []).map((it) => ({
+      ...it,
+      id: '', // limpa ID para gerar novo item
+    }));
+
+    const copiaBase: Pedido = {
+      ...pedidoOriginal,
+      id: '',
+      numeroSequencial: undefined,
+      numero: 'RASCUNHO',
+      status: 'Rascunho',
+      situacaoComercial: pedidoOriginal.situacaoComercial || 'Enviado',
+      dataCadastro: new Date().toISOString(),
+      itens: itensCopiados,
+      numeroPedidoIndustria: '', // limpo para o novo pedido
+      ordemCompraCliente: '',    // limpo para o novo pedido
+      numeroPedidoCliente: '',
+    };
+
+    let novoPedido: Pedido;
+    if (pedidoOriginal.status !== 'Rascunho') {
+      // Se o original era emitido, emite consumindo o próximo número sequencial oficial (ex: PED000005)
+      novoPedido = await this.emitirPedido(copiaBase, formaPagamentoId);
+    } else {
+      // Se era rascunho, cria novo rascunho
+      novoPedido = await this.saveDraft(copiaBase, formaPagamentoId);
+    }
+
+    StorageService.savePedido(novoPedido);
+    return novoPedido;
+  },
+
+  /**
    * EMISSÃO OFICIAL:
    * Salva o pedido/itens em Rascunho e em seguida altera o status para 'Emitido'.
    * O trigger PostgreSQL consome seq_pedidos_numero e gera PEDxxxxxx.
@@ -1174,13 +1269,16 @@ export const PedidoService = {
       throw new Error(`Falha na emissão comercial do pedido: ${error.message}`);
     }
 
-    return {
+    const pedidoEmitido: Pedido = {
       ...salvoRascunho,
       numeroSequencial: emitidoRow.numero_sequencial,
-      numero: emitidoRow.numero_formatado, // ex: PED000001 retornado pelo banco
+      numero: emitidoRow.numero_formatado, // ex: PED000005 retornado pelo banco
       status: 'Emitido',
       situacaoComercial: emitidoRow.situacao_comercial,
     };
+
+    StorageService.savePedido(pedidoEmitido);
+    return pedidoEmitido;
   },
 
   /**

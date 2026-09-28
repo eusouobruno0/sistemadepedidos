@@ -150,24 +150,20 @@ export default function App() {
 
   const handleDuplicarPedido = async (pedido: Pedido) => {
     try {
-      const duplicado: Pedido = {
-        ...pedido,
-        id: '',
-        numeroSequencial: undefined,
-        numero: 'RASCUNHO',
-        status: 'Rascunho',
-        situacaoComercial: 'Enviado',
-        dataCadastro: new Date().toISOString(),
-        numeroPedidoIndustria: '',
-        ordemCompraCliente: '',
-        numeroPedidoCliente: '',
-      };
-      const salvo = await PedidoService.saveDraft(duplicado);
+      showToast(`Duplicando pedido ${pedido.numero}...`, 'info');
+      const formaEncontrada = condicoes.find((c) => c.nome === pedido.formaPagamento);
+      const formaPagamentoId = formaEncontrada?.id;
+
+      const duplicado = await PedidoService.duplicarPedido(pedido, formaPagamentoId);
       await carregarDados();
-      setPedidoParaEditar(salvo);
-      setCurrentTab('novo');
-      showToast('Pedido duplicado em rascunho com sucesso!');
+      showToast(
+        `Pedido ${duplicado.numero} criado com sucesso como cópia de ${pedido.numero}!`,
+        'sucesso'
+      );
+      setPedidoSelecionado(duplicado);
+      setCurrentTab('visualizar');
     } catch (err: any) {
+      console.error('Erro ao duplicar pedido:', err);
       showToast(err.message || 'Erro ao duplicar pedido.', 'erro');
     }
   };
@@ -294,7 +290,7 @@ export default function App() {
     }
   };
 
-  // Salvar pedido (Rascunho ou Emissão Oficial)
+  // Salvar pedido (Rascunho, Emissão Oficial ou Atualização de Pedido Existente)
   const handleSalvarPedido = async (pedido: Pedido, irParaVisualizacao = false) => {
     try {
       let pedidoRetornado: Pedido;
@@ -303,14 +299,20 @@ export default function App() {
       const formaEncontrada = condicoes.find((c) => c.nome === pedido.formaPagamento);
       const formaPagamentoId = formaEncontrada?.id;
 
-      if (irParaVisualizacao && pedido.status !== 'Rascunho') {
-        // EMISSÃO OFICIAL: consome PED do banco
+      const isEdicao = Boolean(pedido.id && pedido.id.trim() !== '');
+
+      if (isEdicao) {
+        // ATUALIZAÇÃO DE PEDIDO EXISTENTE: Preserva o número oficial (ex: PED000003) e o status
+        pedidoRetornado = await PedidoService.atualizarPedido(pedido, formaPagamentoId);
+        showToast(`Pedido ${pedidoRetornado.numero} atualizado com sucesso!`, 'sucesso');
+      } else if (irParaVisualizacao && pedido.status !== 'Rascunho') {
+        // EMISSÃO OFICIAL DE NOVO PEDIDO: consome PED do banco
         pedidoRetornado = await PedidoService.emitirPedido(pedido, formaPagamentoId);
-        showToast(`Pedido emitido com sucesso com número oficial ${pedidoRetornado.numero}!`);
+        showToast(`Pedido emitido com sucesso com número oficial ${pedidoRetornado.numero}!`, 'sucesso');
       } else {
-        // SALVAR RASCUNHO
+        // SALVAR NOVO RASCUNHO
         pedidoRetornado = await PedidoService.saveDraft(pedido, formaPagamentoId);
-        showToast(`Rascunho do pedido salvo com sucesso!`);
+        showToast(`Rascunho do pedido salvo com sucesso!`, 'sucesso');
       }
 
       await carregarDados();
@@ -324,7 +326,23 @@ export default function App() {
       }
     } catch (err: any) {
       console.error('Erro ao salvar pedido:', err);
-      showToast(err.message || 'Falha ao salvar pedido no Supabase.', 'erro');
+      const msg = err.message || 'Falha ao salvar pedido no Supabase.';
+
+      if (
+        msg.includes('fix_permitir_editar_pedidos.sql') ||
+        msg.includes('dados comerciais congelados') ||
+        msg.includes('Não é permitido reverter') ||
+        msg.includes('imutabilidade') ||
+        msg.includes('Operação proibida em itens_pedido')
+      ) {
+        setModalSqlAviso({
+          pedidoId: pedido.id || '',
+          pedidoNumero: pedido.numero || '',
+          erroMsg: msg,
+        });
+      } else {
+        showToast(msg, 'erro');
+      }
     }
   };
 
@@ -534,6 +552,7 @@ export default function App() {
             pedido={pedidoSelecionado}
             onBack={() => setCurrentTab('relatorios')}
             onEdit={(p) => handleEditarPedido(p)}
+            onDuplicar={(p) => handleDuplicarPedido(p)}
           />
         )}
 
@@ -581,7 +600,7 @@ export default function App() {
         )}
       </main>
 
-      {/* MODAL DE AJUDA: LIBERAÇÃO DE EXCLUSÃO NO SUPABASE */}
+      {/* MODAL DE AJUDA: LIBERAÇÃO DE EDIÇÃO OU EXCLUSÃO NO SUPABASE */}
       {modalSqlAviso && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 space-y-4 border border-slate-200 animate-in fade-in duration-200">
@@ -592,7 +611,9 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-slate-900">
-                    Trava de Exclusão no Supabase
+                    {modalSqlAviso.erroMsg.includes('editar') || modalSqlAviso.erroMsg.includes('atualizar') || modalSqlAviso.erroMsg.includes('reverter') || modalSqlAviso.erroMsg.includes('congelados')
+                      ? 'Liberação de Edição no Supabase'
+                      : 'Trava de Exclusão no Supabase'}
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
                     Pedido {modalSqlAviso.pedidoNumero}
@@ -602,7 +623,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setModalSqlAviso(null)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -613,10 +634,12 @@ export default function App() {
                 Por que isso aconteceu?
               </p>
               <p>
-                O seu banco de dados PostgreSQL no Supabase ainda possui uma regra de integridade antiga que proíbe excluir pedidos cancelados ou emitidos (permitia apenas Rascunho).
+                {modalSqlAviso.erroMsg.includes('editar') || modalSqlAviso.erroMsg.includes('atualizar') || modalSqlAviso.erroMsg.includes('reverter') || modalSqlAviso.erroMsg.includes('congelados')
+                  ? 'O seu banco de dados PostgreSQL no Supabase ainda possui gatilhos antigos que congelavam os dados de pedidos emitidos.'
+                  : 'O seu banco de dados PostgreSQL no Supabase ainda possui uma regra de integridade antiga que proíbe excluir pedidos cancelados ou emitidos.'}
               </p>
               <p>
-                Para liberar a exclusão fácil e definitiva de qualquer pedido no seu Supabase:
+                Para liberar a edição e exclusão livre de qualquer pedido no seu Supabase:
               </p>
               <ol className="list-decimal list-inside space-y-1 font-semibold text-slate-800 pt-1">
                 <li>Abra o painel do seu projeto no Supabase;</li>
@@ -630,12 +653,12 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <span className="text-2xs font-bold uppercase text-slate-500 flex items-center gap-1.5">
                   <Terminal className="w-3.5 h-3.5" />
-                  Script de Liberação (fix_excluir_pedidos.sql)
+                  Script de Liberação Total (fix_permitir_editar_pedidos.sql)
                 </span>
                 <button
                   type="button"
                   onClick={() => {
-                    const sqlCode = `-- Executar no SQL Editor do Supabase para liberar exclusão:
+                    const sqlCode = `-- Executar no SQL Editor do Supabase para liberar edicao e exclusao:
 CREATE OR REPLACE FUNCTION public.fn_proteger_itens_pedido()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -648,6 +671,14 @@ CREATE OR REPLACE FUNCTION public.fn_ciclo_vida_e_imutabilidade_pedido()
 RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    IF TG_OP = 'UPDATE' THEN
+        NEW.updated_at := now();
+        IF OLD.status = 'Emitido' THEN
+            NEW.numero_sequencial := OLD.numero_sequencial;
+            NEW.numero_formatado := OLD.numero_formatado;
+            IF NEW.status = 'Rascunho' THEN NEW.status := 'Emitido'; END IF;
+        END IF;
+    END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -683,7 +714,7 @@ GRANT EXECUTE ON FUNCTION public.excluir_pedido_definitivo(UUID) TO authenticate
               </div>
 
               <div className="bg-slate-900 text-slate-200 rounded-xl p-3 font-mono text-[11px] max-h-32 overflow-y-auto leading-tight select-all">
-                {`-- Libera exclusão de qualquer pedido (Rascunho, Emitido ou Cancelado)
+                {`-- Libera edicao e exclusao de qualquer pedido no Supabase
 CREATE OR REPLACE FUNCTION public.fn_proteger_itens_pedido()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -696,46 +727,27 @@ CREATE OR REPLACE FUNCTION public.fn_ciclo_vida_e_imutabilidade_pedido()
 RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    IF TG_OP = 'UPDATE' THEN
+        NEW.updated_at := now();
+        IF OLD.status = 'Emitido' THEN
+            NEW.numero_sequencial := OLD.numero_sequencial;
+            NEW.numero_formatado := OLD.numero_formatado;
+            IF NEW.status = 'Rascunho' THEN NEW.status := 'Emitido'; END IF;
+        END IF;
+    END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION public.excluir_pedido_definitivo(p_pedido_id UUID)
-RETURNS BOOLEAN AS $$
-BEGIN
-    DELETE FROM public.itens_pedido WHERE pedido_id = p_pedido_id;
-    DELETE FROM public.pedidos WHERE id = p_pedido_id;
-    RETURN true;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-GRANT EXECUTE ON FUNCTION public.excluir_pedido_definitivo(UUID) TO authenticated, anon;`}
+$$ LANGUAGE plpgsql;`}
               </div>
             </div>
 
-            {/* Ações do Modal */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setPedidos((prev) => prev.filter((p) => p.id !== modalSqlAviso.pedidoId));
-                  if (pedidoSelecionado?.id === modalSqlAviso.pedidoId) {
-                    setPedidoSelecionado(null);
-                  }
-                  setModalSqlAviso(null);
-                  showToast('Pedido removido da visualização.', 'info');
-                }}
-                className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-              >
-                Ocultar pedido da tela agora
-              </button>
-
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setModalSqlAviso(null)}
-                className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl transition-colors cursor-pointer"
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs cursor-pointer transition-colors"
               >
-                Entendi, vou executar no Supabase
+                Entendido, fechar
               </button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Printer,
   Share2,
@@ -6,13 +6,8 @@ import {
   Edit3,
   Copy,
   Check,
-  Download,
   Phone,
   FileCheck,
-  Loader2,
-  CheckCircle2,
-  AlertTriangle,
-  Smartphone,
 } from 'lucide-react';
 import { Pedido } from '../types';
 import {
@@ -24,100 +19,24 @@ import {
   formatCep,
   formatPhone,
 } from '../utils/formatters';
-import { downloadElementAsPdf, shareElementAsPdf } from '../utils/pdfGenerator';
 
 interface PedidoPrintViewProps {
   pedido: Pedido;
   onBack: () => void;
   onEdit: (pedido: Pedido) => void;
+  onDuplicar?: (pedido: Pedido) => void;
 }
 
-export const PedidoPrintView: React.FC<PedidoPrintViewProps> = ({ pedido, onBack, onEdit }) => {
+export const PedidoPrintView: React.FC<PedidoPrintViewProps> = ({
+  pedido,
+  onBack,
+  onEdit,
+  onDuplicar,
+}) => {
   const [copiado, setCopiado] = useState(false);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [pdfSuccessMessage, setPdfSuccessMessage] = useState<string | null>(null);
-  const [pdfErrorMessage, setPdfErrorMessage] = useState<string | null>(null);
-  const [canShareFile, setCanShareFile] = useState(false);
   const documentoRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (typeof navigator !== 'undefined' && 'canShare' in navigator) {
-      setCanShareFile(true);
-    }
-  }, []);
-
-  // Download real do arquivo PDF
-  const handleBaixarPdf = async () => {
-    if (!documentoRef.current) return;
-
-    const sanitizedNomeCliente = (pedido.cliente?.razaoSocial || 'Cliente')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9]/g, '_')
-      .slice(0, 30);
-
-    const tipoPrefixo = pedido.tipo === 'ORCAMENTO' ? 'Orcamento' : 'Pedido';
-    const nomeArquivo = `${tipoPrefixo}_${pedido.numero}_${sanitizedNomeCliente}.pdf`;
-
-    setPdfErrorMessage(null);
-    setPdfSuccessMessage(null);
-
-    try {
-      await downloadElementAsPdf(documentoRef.current, {
-        fileName: nomeArquivo,
-        onStart: () => setIsGeneratingPdf(true),
-        onSuccess: () => {
-          setIsGeneratingPdf(false);
-          setPdfSuccessMessage(`Arquivo "${nomeArquivo}" baixado com sucesso!`);
-          setTimeout(() => setPdfSuccessMessage(null), 5000);
-        },
-        onError: (err) => {
-          setIsGeneratingPdf(false);
-          setPdfErrorMessage(`Não foi possível gerar o PDF: ${err.message || 'Erro desconhecido'}`);
-        },
-      });
-    } catch (err: any) {
-      setIsGeneratingPdf(false);
-      setPdfErrorMessage('Erro ao converter o documento para PDF. Tente novamente ou use a opção de Imprimir.');
-    }
-  };
-
-  // Salvar / Compartilhar nativo no Celular (WhatsApp, Arquivos do iPhone, Google Drive no Android)
-  const handleCompartilharPdf = async () => {
-    if (!documentoRef.current) return;
-
-    const sanitizedNomeCliente = (pedido.cliente?.razaoSocial || 'Cliente')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9]/g, '_')
-      .slice(0, 30);
-
-    const tipoPrefixo = pedido.tipo === 'ORCAMENTO' ? 'Orcamento' : 'Pedido';
-    const nomeArquivo = `${tipoPrefixo}_${pedido.numero}_${sanitizedNomeCliente}.pdf`;
-    const titulo = `${pedido.tipo === 'ORCAMENTO' ? 'Orçamento' : 'Pedido'} ${pedido.numero} - ${pedido.cliente.razaoSocial}`;
-
-    setIsGeneratingPdf(true);
-    setPdfErrorMessage(null);
-    setPdfSuccessMessage(null);
-
-    try {
-      const compartilhou = await shareElementAsPdf(documentoRef.current, nomeArquivo, titulo);
-      setIsGeneratingPdf(false);
-      if (compartilhou) {
-        setPdfSuccessMessage('PDF compartilhado / salvo com sucesso no celular!');
-      } else {
-        setPdfSuccessMessage(`Arquivo "${nomeArquivo}" baixado com sucesso!`);
-      }
-      setTimeout(() => setPdfSuccessMessage(null), 5000);
-    } catch (err: any) {
-      setIsGeneratingPdf(false);
-      if (err.name !== 'AbortError') {
-        setPdfErrorMessage('Não foi possível compartilhar o arquivo no momento.');
-      }
-    }
-  };
-
-  // Impressão limpa com suporte a iframe
+  // Impressão limpa com suporte a iframe e diálogo nativo (permite imprimir diretamente ou Salvar como PDF)
   const handleImprimir = () => {
     try {
       const printContent = documentoRef.current;
@@ -268,37 +187,16 @@ Ficamos à disposição para qualquer esclarecimento!`);
             <span>Voltar para Pedidos</span>
           </button>
 
-          {/* BOTÕES DE DESTAQUE: BAIXAR PDF E COMPARTILHAR */}
-          <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
-            {canShareFile && (
-              <button
-                type="button"
-                id="btn-compartilhar-pdf"
-                onClick={handleCompartilharPdf}
-                disabled={isGeneratingPdf}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm sm:text-base font-bold text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border-2 border-indigo-300 rounded-xl transition-all cursor-pointer disabled:opacity-50 min-h-[44px]"
-                title="Salvar em Arquivos ou enviar pelo WhatsApp"
-              >
-                <Share2 className="w-4 h-4 text-indigo-700" />
-                <span>Salvar / Compartilhar no Celular</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              id="btn-baixar-pdf"
-              onClick={handleBaixarPdf}
-              disabled={isGeneratingPdf}
-              className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 text-base font-black text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl shadow-md shadow-indigo-700/20 transition-all cursor-pointer disabled:opacity-50 min-h-[48px]"
-            >
-              {isGeneratingPdf ? (
-                <Loader2 className="w-5 h-5 animate-spin text-white" />
-              ) : (
-                <Download className="w-5 h-5 text-indigo-200" />
-              )}
-              <span>{isGeneratingPdf ? 'Gerando PDF...' : 'BAIXAR PDF'}</span>
-            </button>
-          </div>
+          {/* BOTÃO PRINCIPAL DE DESTAQUE: IMPRIMIR */}
+          <button
+            type="button"
+            id="btn-imprimir-principal"
+            onClick={handleImprimir}
+            className="inline-flex items-center justify-center gap-2.5 px-7 sm:px-9 py-3 text-base font-black text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl shadow-md shadow-indigo-700/20 transition-all cursor-pointer min-h-[48px]"
+          >
+            <Printer className="w-5 h-5 text-indigo-100" />
+            <span>IMPRIMIR</span>
+          </button>
         </div>
 
         {/* Linha secundária de ações rápidas */}
@@ -311,6 +209,19 @@ Ficamos à disposição para qualquer esclarecimento!`);
             <Edit3 className="w-4 h-4 text-slate-600" />
             <span>Editar</span>
           </button>
+
+          {onDuplicar && (
+            <button
+              type="button"
+              id="btn-duplicar-pedido-print"
+              onClick={() => onDuplicar(pedido)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-colors cursor-pointer min-h-[40px]"
+              title="Criar cópia deste pedido com o próximo número sequencial oficial"
+            >
+              <Copy className="w-4 h-4 text-purple-600" />
+              <span>Duplicar Pedido</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -333,36 +244,12 @@ Ficamos à disposição para qualquer esclarecimento!`);
             <Share2 className="w-4 h-4" />
             <span>Texto WhatsApp</span>
           </button>
-
-          <button
-            type="button"
-            onClick={handleImprimir}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 rounded-xl transition-colors cursor-pointer min-h-[40px]"
-          >
-            <Printer className="w-4 h-4 text-slate-700" />
-            <span>Imprimir</span>
-          </button>
         </div>
       </div>
 
-      {/* FEEDBACK DE SUCESSO OU ERRO DO PDF */}
-      {pdfSuccessMessage && (
-        <div className="no-print p-4 bg-emerald-50 border-2 border-emerald-300 rounded-xl text-emerald-900 font-bold text-sm sm:text-base flex items-center gap-3 animate-in fade-in duration-200">
-          <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
-          <span>{pdfSuccessMessage}</span>
-        </div>
-      )}
-
-      {pdfErrorMessage && (
-        <div className="no-print p-4 bg-red-50 border-2 border-red-300 rounded-xl text-red-900 font-bold text-sm sm:text-base flex items-center gap-3 animate-in fade-in duration-200">
-          <AlertTriangle className="w-6 h-6 text-red-600 shrink-0" />
-          <span>{pdfErrorMessage}</span>
-        </div>
-      )}
-
       {/* Aviso informativo em telas menores */}
       <div className="no-print block sm:hidden text-center text-xs text-slate-500 font-medium bg-slate-100 py-2 px-3 rounded-lg border border-slate-200">
-        ↔ Deslize para os lados para visualizar a folha completa. O PDF baixado é formatado em página A4 oficial.
+        ↔ Deslize para os lados para visualizar a folha completa. O documento é formatado em página A4 oficial para impressão direta ou salvar como PDF.
       </div>
 
       {/* DOCUMENTO OFICIAL A4 (Réplica fiel da folha impressa com scroll horizontal no celular) */}

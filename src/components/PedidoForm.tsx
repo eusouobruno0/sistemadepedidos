@@ -734,13 +734,17 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
 
     const industriaNum = numeroPedidoIndustria.trim();
     const ocCliente = ordemCompraCliente.trim();
+    const statusFinal: StatusPedido = pedidoParaEditar
+      ? (pedidoParaEditar.status || 'Aprovado')
+      : statusAlvo;
+
     const pedidoSalvo: Pedido = {
       id: pedidoParaEditar?.id || '',
       numeroSequencial: pedidoParaEditar?.numeroSequencial,
       numero: pedidoParaEditar?.numero || (statusAlvo === 'Rascunho' ? 'RASCUNHO' : numero),
       tipo,
-      status: statusAlvo,
-      situacaoComercial,
+      status: statusFinal,
+      situacaoComercial: pedidoParaEditar?.situacaoComercial || situacaoComercial,
       dataCadastro: pedidoParaEditar?.dataCadastro || new Date().toISOString(),
       dataPrevista: previsaoEntrega,
       numeroPedidoIndustria: industriaNum,
@@ -2119,21 +2123,28 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
             </button>
 
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-              <button
-                type="button"
-                id="btn-salvar-rascunho"
-                onClick={() => handleFinalizarPedido('Rascunho', false)}
-                disabled={isSubmittingPedido}
-                className="w-full sm:w-auto h-14 px-8 bg-white hover:bg-slate-100 text-slate-900 rounded-xl font-bold text-base transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2"
-              >
-                <FileText className="w-5 h-5 text-slate-500" />
-                <span>Salvar como rascunho</span>
-              </button>
+              {!pedidoParaEditar && (
+                <button
+                  type="button"
+                  id="btn-salvar-rascunho"
+                  onClick={() => handleFinalizarPedido('Rascunho', false)}
+                  disabled={isSubmittingPedido}
+                  className="w-full sm:w-auto h-14 px-8 bg-white hover:bg-slate-100 text-slate-900 rounded-xl font-bold text-base transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                >
+                  <FileText className="w-5 h-5 text-slate-500" />
+                  <span>Salvar como rascunho</span>
+                </button>
+              )}
 
               <button
                 type="button"
-                id="btn-gerar-pedido"
-                onClick={() => handleFinalizarPedido('Aprovado', true)}
+                id={pedidoParaEditar ? 'btn-atualizar-pedido' : 'btn-gerar-pedido'}
+                onClick={() =>
+                  handleFinalizarPedido(
+                    pedidoParaEditar ? (pedidoParaEditar.status || 'Aprovado') : 'Aprovado',
+                    true
+                  )
+                }
                 disabled={isSubmittingPedido}
                 className="w-full sm:w-auto h-14 px-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-lg shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-3"
               >
@@ -2142,7 +2153,11 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                 ) : (
                   <FileCheck className="w-6 h-6 text-emerald-300" />
                 )}
-                <span>GERAR PEDIDO</span>
+                <span>
+                  {pedidoParaEditar
+                    ? `ATUALIZAR ${tipo === 'ORCAMENTO' ? 'ORÇAMENTO' : 'PEDIDO'}`
+                    : `GERAR ${tipo === 'ORCAMENTO' ? 'ORÇAMENTO' : 'PEDIDO'}`}
+                </span>
                 <ArrowRight className="w-5 h-5" />
               </button>
             </div>
