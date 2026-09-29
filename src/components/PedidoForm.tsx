@@ -254,7 +254,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
 
   // Atualiza o local de entrega automaticamente se estiver em branco ao preencher endereço do cliente
   useEffect(() => {
-    if (!localEntrega && clienteEndereco) {
+    if (tipoFrete !== 'CIF' && !localEntrega && clienteEndereco) {
       const montado = [
         clienteEndereco,
         clienteNumero ? `nº ${clienteNumero}` : '',
@@ -265,7 +265,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
         .join(' ');
       setLocalEntrega(montado);
     }
-  }, [clienteEndereco, clienteNumero, clienteBairro, clienteCidade, clienteEstado, localEntrega]);
+  }, [clienteEndereco, clienteNumero, clienteBairro, clienteCidade, clienteEstado, localEntrega, tipoFrete]);
 
   // Detecta se os dados de um cliente existente foram alterados durante o pedido
   const clienteFoiAlteradoManualmente = useMemo(() => {
@@ -316,7 +316,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
     setClienteCidade(encontrado.cidade || '');
     setClienteEstado(encontrado.estado || 'RS');
 
-    if (!localEntrega) {
+    if (tipoFrete !== 'CIF' && !localEntrega) {
       const enderecoCompleto = [
         encontrado.endereco,
         encontrado.numero ? `nº ${encontrado.numero}` : '',
@@ -723,7 +723,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
       numeroPedidoCliente: ocCliente,
       empresaEmissora: empresaFinal,
       cliente: clienteSnapshot,
-      localEntrega: localEntrega.trim(),
+      localEntrega: tipoFrete === 'CIF' ? '' : localEntrega.trim(),
       transportadora: transpFinal,
       tipoFrete,
       vendedor,
@@ -1413,8 +1413,8 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
               </select>
             </div>
 
-            {/* Transportadora */}
-            <div className="md:col-span-7">
+            {/* Transportadora: somente quando não for CIF */}
+            {tipoFrete !== 'CIF' && <div className="md:col-span-7">
               <div className="flex items-center justify-between mb-1.5">
                 <label
                   htmlFor="pedido-transportadora"
@@ -1444,7 +1444,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                   </option>
                 ))}
               </select>
-            </div>
+            </div>}
 
             {/* Frete CIF / FOB */}
             <div className="md:col-span-5">
@@ -1464,7 +1464,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                     name="tipoFrete"
                     value="CIF"
                     checked={tipoFrete === 'CIF'}
-                    onChange={() => setTipoFrete('CIF')}
+                    onChange={() => { setTipoFrete('CIF'); setLocalEntrega(''); }}
                     className="w-5 h-5 text-indigo-600"
                   />
                   <div className="leading-tight">
@@ -1496,8 +1496,8 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
               </div>
             </div>
 
-            {/* Local de Entrega */}
-            <div className="md:col-span-12">
+            {/* Local de Entrega: CIF não exige preenchimento */}
+            {tipoFrete !== 'CIF' && <div className="md:col-span-12">
               <label
                 htmlFor="pedido-local-entrega"
                 className="block text-base font-bold text-slate-800 mb-1.5"
@@ -1512,7 +1512,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                 placeholder="Endereço de entrega / filial de recebimento..."
                 className="w-full h-12 px-4 text-base font-medium bg-white border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
               />
-            </div>
+            </div>}
 
             {/* Forma de Pagamento */}
             <div className="md:col-span-6">
