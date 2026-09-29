@@ -1817,12 +1817,11 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                   prodRef?.quantidadePorCaixa ||
                   (prodRef?.qtdMilheiroPorCaixa ? Math.round(prodRef.qtdMilheiroPorCaixa * 1000) : 1000);
 
-                const prCaixaEfetivo = item.precoCaixa || item.precoUnitario;
-                const prUnEfetivo =
-                  item.precoUnidade ||
-                  (qtdCx > 0 ? Number((prCaixaEfetivo / qtdCx).toFixed(4)) : prCaixaEfetivo);
-                const prMilEfetivo =
-                  item.precoMilheiro || Number((prUnEfetivo * 1000).toFixed(2));
+                // Fonte única de conversão: preço do milheiro.
+                // MIL = 1.000 unidades físicas, independentemente da quantidade por caixa.
+                const prMilEfetivo = item.precoMilheiro || 0;
+                const prUnEfetivo = Number((prMilEfetivo / 1000).toFixed(5));
+                const prCaixaEfetivo = Number(((prMilEfetivo * qtdCx) / 1000).toFixed(2));
 
                 return (
                   <div
@@ -1931,7 +1930,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                       {/* ENTRADA 2: PREÇO DA CAIXA (SOMA DO SISTEMA) */}
                       <div className="md:col-span-3">
                         <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
-                          <span>{item.unidadeMedida === 'CX' ? 'Pr. Caixa (R$)' : 'Pr. Unitário (R$)'}</span>
+                          <span>{item.unidadeMedida === 'CX' ? 'Pr. Caixa (R$)' : 'Pr. por Unidade Física (R$)'}</span>
                           <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1 rounded">
                             Soma do sistema
                           </span>
@@ -1940,10 +1939,8 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={item.unidadeMedida === 'CX' ? item.precoCaixa : item.precoUnitario}
-                          onChange={(e) =>
-                            atualizarItemPedido(idx, 'precoCaixa', e.target.value)
-                          }
+                          value={item.unidadeMedida === 'CX' ? item.precoCaixa : item.precoUnidade}
+                          readOnly
                           className="w-full h-12 px-3 text-lg font-mono font-bold text-right text-slate-900 bg-slate-50 border-2 border-slate-300 rounded-xl focus:border-indigo-600 outline-hidden"
                         />
                       </div>
