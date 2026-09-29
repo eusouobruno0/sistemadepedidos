@@ -46,7 +46,7 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
         setUnidadeMedida(initialData.unidadeMedida || 'CX');
         setRepresentadaId(initialData.representadaId || representadas[0]?.id || '');
 
-        const qtdCx = initialData.quantidadePorCaixa || 1000;
+        const qtdCx = initialData.quantidadePorCaixa || 1;
         setQuantidadePorCaixa(qtdCx);
 
         const prMil = initialData.precoMilheiro || 0;
@@ -127,7 +127,7 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
       descricao: descricao.toUpperCase().trim(),
       referencia: referencia.toUpperCase().trim(),
       unidadeMedida,
-      quantidadePorCaixa: unidadeMedida === 'CX' ? quantidadePorCaixa : 1,
+      quantidadePorCaixa: Number(quantidadePorCaixa) || 1,
       precoMilheiro,
       precoCaixa,
       precoUnidade,
@@ -274,7 +274,7 @@ export const ProdutoModal: React.FC<ProdutoModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Qtd por Caixa (unidades)
+                  Quantidade por Caixa (unidades físicas)
                 </label>
                 <input
                   type="number"
