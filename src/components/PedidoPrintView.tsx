@@ -191,9 +191,16 @@ ${pedido.observacoes || ''}`;
           id="documento-impresso"
           className="print-container bg-white rounded-xl shadow-md border border-slate-300 min-w-[680px] max-w-[210mm] mx-auto p-6 sm:p-8 font-sans text-slate-900"
         >
-        {/* Topo: Página */}
-        <div className="text-right text-[10px] text-slate-500 font-mono mb-1">
-          Página 1 de 1
+        {/* Topo: logo DCT + Página */}
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <img
+            src="https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representac%CC%A7o%CC%83es.png"
+            alt="DCT Representações"
+            className="h-14 w-auto object-contain object-left"
+          />
+          <div className="text-right text-[10px] text-slate-500 font-mono pt-1">
+            Página 1 de 1
+          </div>
         </div>
 
         {/* TÍTULO PRINCIPAL */}
