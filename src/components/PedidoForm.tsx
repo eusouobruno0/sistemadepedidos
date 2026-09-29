@@ -182,52 +182,9 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
   const [mensagemProdutoAdicionado, setMensagemProdutoAdicionado] = useState<string>('');
 
   const [itens, setItens] = useState<ItemPedido[]>(() => {
+    // Pedido novo sempre começa sem nenhum produto selecionado.
     if (pedidoParaEditar?.itens && pedidoParaEditar.itens.length > 0) {
       return pedidoParaEditar.itens;
-    }
-    // Item inicial vazio se for novo pedido
-    const p = produtos[0];
-    if (p) {
-      const qtdPorCaixa =
-        p.quantidadePorCaixa ||
-        (p.qtdMilheiroPorCaixa ? Math.round(p.qtdMilheiroPorCaixa * 1000) : 1000);
-      const prMilheiro =
-        p.precoMilheiro ||
-        (p.precoUnidade
-          ? Number((p.precoUnidade * 1000).toFixed(2))
-          : p.precoCaixa && qtdPorCaixa > 0
-          ? Number(((p.precoCaixa / qtdPorCaixa) * 1000).toFixed(2))
-          : 90);
-      const prUnidade = Number((prMilheiro / 1000).toFixed(4));
-      const prCaixa = Number(((prMilheiro * qtdPorCaixa) / 1000).toFixed(2));
-      const ipi = p.aliquotaIpi || 0;
-      const valorUnitarioEfetivo =
-        p.unidadeMedida === 'UN' ? prUnidade : p.unidadeMedida === 'MIL' ? prMilheiro : prCaixa;
-      const valorItens = valorUnitarioEfetivo;
-      const valorIpi = Number(((valorItens * ipi) / 100).toFixed(2));
-
-      return [
-        {
-          id: '',
-          produtoId: p.id,
-          codigo: p.codigo,
-          codigoInterno: p.codigoInterno || '000001',
-          descricao: p.descricao,
-          referencia: p.referencia || '',
-          unidadeMedida: p.unidadeMedida || 'CX',
-          quantidade: 1,
-          quantidadePorCaixa: qtdPorCaixa,
-          precoCaixa: prCaixa,
-          precoUnidade: prUnidade,
-          precoMilheiro: prMilheiro,
-          qtdMilheiro: qtdPorCaixa / 1000,
-          precoUnitario: valorUnitarioEfetivo,
-          aliquotaIpi: ipi,
-          valorItens,
-          valorIpi,
-          pesoTotalKg: p.pesoUnitarioKg || 0,
-        },
-      ];
     }
     return [];
   });
@@ -487,7 +444,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
   const adicionarProdutoAoPedido = (p: Produto) => {
     const qtdPorCaixa =
       p.quantidadePorCaixa ||
-      (p.qtdMilheiroPorCaixa ? Math.round(p.qtdMilheiroPorCaixa * 1000) : 1000);
+      (p.qtdMilheiroPorCaixa ? Math.round(p.qtdMilheiroPorCaixa * 1000) : 1);
     const prMilheiro =
       p.precoMilheiro ||
       (p.precoUnidade
@@ -582,7 +539,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
     const novos = [...itens];
     const item = { ...novos[index] };
     const pOriginal = produtos.find((prod) => prod.id === item.produtoId);
-    const qtdPorCx = item.quantidadePorCaixa || pOriginal?.quantidadePorCaixa || 1000;
+    const qtdPorCx = item.quantidadePorCaixa || pOriginal?.quantidadePorCaixa || 1;
 
     if (campo === 'quantidade') {
       const qtd = Math.max(1, Number(valor) || 1);
@@ -591,14 +548,28 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
         item.pesoTotalKg = (pOriginal.pesoUnitarioKg || 0) * qtd;
       }
     } else if (campo === 'unidadeMedida') {
+      const unidadeAnterior = item.unidadeMedida;
       const novaUn = valor as string;
+      const quantidadeAnterior = Number(item.quantidade) || 0;
+
+      // Converte a quantidade preservando o mesmo total físico de unidades.
+      let totalUnidades = quantidadeAnterior;
+      if (unidadeAnterior === 'CX') totalUnidades = quantidadeAnterior * qtdPorCx;
+      else if (unidadeAnterior === 'MIL') totalUnidades = quantidadeAnterior * 1000;
+
+      if (novaUn === 'CX') item.quantidade = Number((totalUnidades / Math.max(1, qtdPorCx)).toFixed(4));
+      else if (novaUn === 'MIL') item.quantidade = Number((totalUnidades / 1000).toFixed(4));
+      else if (novaUn === 'UN') item.quantidade = Number(totalUnidades.toFixed(4));
+
       item.unidadeMedida = novaUn;
       if (novaUn === 'UN') {
         item.precoUnitario = item.precoUnidade || Number(((item.precoMilheiro || 0) / 1000).toFixed(4));
       } else if (novaUn === 'MIL') {
         item.precoUnitario = item.precoMilheiro || 0;
-      } else {
+      } else if (novaUn === 'CX') {
         item.precoUnitario = item.precoCaixa || 0;
+      } else {
+        item.precoUnitario = item.precoUnitario || 0;
       }
     } else if (campo === 'precoMilheiro') {
       // ENTRADA PRINCIPAL: Altera o Milheiro -> Sistema recalcula e soma a Caixa
