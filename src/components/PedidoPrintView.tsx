@@ -350,7 +350,7 @@ ${pedido.observacoes || ''}`;
 
           <div className="grid grid-cols-12 gap-2 mt-1">
             <div className="col-span-8">
-              <span className="font-bold">Transportadora:</span> {pedido.transportadora.nome}
+              <span className="font-bold">Transportadora:</span> {pedido.tipoFrete === 'CIF' ? 'CIF' : pedido.transportadora.nome}
             </div>
             <div className="col-span-4 text-right">
               <span className="font-bold">Frete:</span>{' '}
