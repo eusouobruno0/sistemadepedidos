@@ -28,8 +28,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="text-xl font-black text-slate-900 hover:opacity-85 transition-opacity cursor-pointer tracking-tight"
             >
               <span className="inline-flex items-center gap-2 sm:gap-2.5">
-                <img src="https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representac%CC%A7o%CC%83es.png" alt="DCT Representações" className="h-8 sm:h-9 w-auto object-contain" />
-                <span>DCT Gestão de Pedidos</span>
+                <img src="https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representac%CC%A7o%CC%83es.png?v=fixacoes" alt="DCT FIXAÇÕES" className="h-8 sm:h-9 w-auto object-contain" />
+                <span>DCT FIXAÇÕES · Gestão de Pedidos</span>
               </span>
             </button>
 
@@ -95,8 +95,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="text-base font-black text-slate-900 tracking-tight"
             >
               <span className="inline-flex items-center gap-2 sm:gap-2.5">
-                <img src="https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representac%CC%A7o%CC%83es.png" alt="DCT Representações" className="h-8 sm:h-9 w-auto object-contain" />
-                <span>DCT Gestão de Pedidos</span>
+                <img src="https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representac%CC%A7o%CC%83es.png?v=fixacoes" alt="DCT FIXAÇÕES" className="h-8 sm:h-9 w-auto object-contain" />
+                <span>DCT FIXAÇÕES</span>
               </span>
             </button>
 
