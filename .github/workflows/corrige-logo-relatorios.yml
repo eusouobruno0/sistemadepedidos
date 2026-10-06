@@ -1,0 +1,45 @@
+name: Corrigir logo e numero nos relatorios
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  corrigir:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Aplicar correcoes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          canonical = 'https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representa%C3%A7%C3%B5es.png'
+          old = 'https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representac%CC%A7o%CC%83es.png?v=fixacoes'
+
+          for filename in ['src/components/Navbar.tsx', 'src/components/PedidoPrintView.tsx']:
+              p = Path(filename)
+              s = p.read_text()
+              s = s.replace(old, canonical)
+              p.write_text(s)
+
+          p = Path('src/components/Navbar.tsx')
+          s = p.read_text()
+          s = s.replace('<span>DCT FIXAÇÕES · Gestão de Pedidos</span>', '<span>Gestão de Pedidos</span>')
+          s = s.replace('<span>DCT FIXAÇÕES</span>', '<span>Gestão de Pedidos</span>')
+          p.write_text(s)
+
+          p = Path('src/components/PedidosList.tsx')
+          s = p.read_text()
+          s = s.replace('<th className="py-3 px-4">Documento</th>', '<th className="py-3 px-4">Nº do Pedido</th>')
+          p.write_text(s)
+          PY
+      - name: Salvar correcoes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/Navbar.tsx src/components/PedidoPrintView.tsx src/components/PedidosList.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Corrige logo DCT e exibe numero do pedido nos relatorios"
+          git push
