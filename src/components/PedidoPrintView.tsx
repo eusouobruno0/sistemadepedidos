@@ -194,8 +194,8 @@ ${pedido.observacoes || ''}`;
         {/* Topo: logo DCT + Página */}
         <div className="flex items-start justify-between gap-4 mb-2">
           <img
-            src="https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representac%CC%A7o%CC%83es.png"
-            alt="DCT Representações"
+            src="https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representac%CC%A7o%CC%83es.png?v=fixacoes"
+            alt="DCT FIXAÇÕES"
             className="h-14 w-auto object-contain object-left"
           />
           <div className="text-right text-[10px] text-slate-500 font-mono pt-1">
