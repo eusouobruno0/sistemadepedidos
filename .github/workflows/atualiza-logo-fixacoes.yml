@@ -1,0 +1,29 @@
+name: Atualizar logo DCT FIXACOES no PDF
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Atualizar logo no PDF
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/PedidoPrintView.tsx')
+          s = p.read_text()
+          s = s.replace('Logo%20DCT%20Representac%CC%A7o%CC%83es.png"', 'Logo%20DCT%20Representac%CC%A7o%CC%83es.png?v=fixacoes"')
+          s = s.replace('alt="DCT Representações"', 'alt="DCT FIXAÇÕES"')
+          p.write_text(s)
+          PY
+      - name: Salvar
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/PedidoPrintView.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Atualiza logo DCT FIXAÇÕES no PDF"
+          git push
