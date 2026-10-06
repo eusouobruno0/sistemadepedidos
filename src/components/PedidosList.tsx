@@ -436,6 +436,12 @@ export const PedidosList: React.FC<PedidosListProps> = ({
               {pedidosFiltrados.map((p) => {
                 const ocCliente = p.ordemCompraCliente || p.numeroPedidoCliente;
                 const situacao = p.situacaoComercial || 'Enviado';
+      const numeroSistema =
+        p.numero && p.numero !== 'RASCUNHO'
+          ? p.numero
+          : p.numeroSequencial
+          ? `PED${String(p.numeroSequencial).padStart(6, '0')}`
+          : 'RASCUNHO';
 
                 return (
                   <div key={p.id} className="p-4 space-y-3 bg-white hover:bg-slate-50/60 transition-colors">
@@ -447,12 +453,12 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                           onClick={() => onVisualizar(p)}
                           className="font-mono font-black text-base text-indigo-700 hover:text-indigo-900 cursor-pointer"
                         >
-                          {p.numero === 'RASCUNHO' ? (
+                          {numeroSistema === 'RASCUNHO' ? (
                             <span className="inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs">
                               RASCUNHO
                             </span>
                           ) : (
-                            p.numero
+                            numeroSistema
                           )}
                         </button>
 
@@ -618,6 +624,12 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                   {pedidosFiltrados.map((p) => {
                     const ocCliente = p.ordemCompraCliente || p.numeroPedidoCliente;
                     const situacao = p.situacaoComercial || 'Enviado';
+      const numeroSistema =
+        p.numero && p.numero !== 'RASCUNHO'
+          ? p.numero
+          : p.numeroSequencial
+          ? `PED${String(p.numeroSequencial).padStart(6, '0')}`
+          : 'RASCUNHO';
 
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
@@ -629,12 +641,12 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                               onClick={() => onVisualizar(p)}
                               className="font-mono font-bold text-indigo-700 hover:text-indigo-900 cursor-pointer text-sm"
                             >
-                              {p.numero === 'RASCUNHO' ? (
+                              {numeroSistema === 'RASCUNHO' ? (
                                 <span className="inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs">
                                   RASCUNHO
                                 </span>
                               ) : (
-                                p.numero
+                                numeroSistema
                               )}
                             </button>
                             <div className="flex items-center gap-1">

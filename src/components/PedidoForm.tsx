@@ -715,7 +715,7 @@ export const PedidoForm: React.FC<PedidoFormProps> = ({
       numero: pedidoParaEditar?.numero || (statusAlvo === 'Rascunho' ? 'RASCUNHO' : numero),
       tipo,
       status: statusFinal,
-      situacaoComercial: pedidoParaEditar?.situacaoComercial || situacaoComercial,
+      situacaoComercial: situacaoComercial,
       dataCadastro: pedidoParaEditar?.dataCadastro || new Date().toISOString(),
       dataPrevista: previsaoEntrega,
       numeroPedidoIndustria: industriaNum,
