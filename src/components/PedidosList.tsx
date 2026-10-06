@@ -610,7 +610,7 @@ export const PedidosList: React.FC<PedidosListProps> = ({
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 select-none">
-                    <th className="py-3 px-4">Documento</th>
+                    <th className="py-3 px-4">Nº do Pedido</th>
                     <th className="py-3 px-4 text-center">Situação Comercial</th>
                     <th className="py-3 px-4">Cliente & Ordem de Compra</th>
                     <th className="py-3 px-4">Vendedor & Pagamento</th>
