@@ -436,6 +436,12 @@ export const PedidosList: React.FC<PedidosListProps> = ({
               {pedidosFiltrados.map((p) => {
                 const ocCliente = p.ordemCompraCliente || p.numeroPedidoCliente;
                 const situacao = p.situacaoComercial || 'Enviado';
+      const numeroSistema =
+        p.numero && p.numero !== 'RASCUNHO'
+          ? p.numero
+          : p.numeroSequencial
+          ? `PED${String(p.numeroSequencial).padStart(6, '0')}`
+          : 'RASCUNHO';
 
                 return (
                   <div key={p.id} className="p-4 space-y-3 bg-white hover:bg-slate-50/60 transition-colors">
@@ -618,6 +624,12 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                   {pedidosFiltrados.map((p) => {
                     const ocCliente = p.ordemCompraCliente || p.numeroPedidoCliente;
                     const situacao = p.situacaoComercial || 'Enviado';
+      const numeroSistema =
+        p.numero && p.numero !== 'RASCUNHO'
+          ? p.numero
+          : p.numeroSequencial
+          ? `PED${String(p.numeroSequencial).padStart(6, '0')}`
+          : 'RASCUNHO';
 
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
