@@ -1,16 +1,9 @@
 name: Aplicar correcoes do pedido
-
 on:
   push:
-    branches:
-      - corrige-numero-e-status-edicao
-  pull_request:
-    branches:
-      - main
-
+    branches: [corrige-numero-e-status-edicao]
 permissions:
   contents: write
-
 jobs:
   corrigir:
     runs-on: ubuntu-latest
@@ -18,58 +11,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: corrige-numero-e-status-edicao
-      - name: Corrigir situacao comercial e numero exibido
+      - name: Aplicar ajustes
         run: |
           python - <<'PY'
           from pathlib import Path
-          form = Path('src/components/PedidoForm.tsx')
-          s = form.read_text()
-          antigo = "situacaoComercial: pedidoParaEditar?.situacaoComercial || situacaoComercial,"
-          novo = "situacaoComercial: situacaoComercial,"
-          if antigo in s:
-              form.write_text(s.replace(antigo, novo, 1))
-
-          lista = Path('src/components/PedidosList.tsx')
-          s = lista.read_text()
-          marcador = "const situacao = p.situacaoComercial || 'Enviado';"
-          insercao = """const situacao = p.situacaoComercial || 'Enviado';
-                const numeroSistema =
-                  p.numero && p.numero !== 'RASCUNHO'
-                    ? p.numero
-                    : p.numeroSequencial
-                    ? `PED${String(p.numeroSequencial).padStart(6, '0')}`
-                    : 'RASCUNHO';"""
-          if 'const numeroSistema =' not in s:
-              s = s.replace(marcador, insercao, 2)
-          s = s.replace("""{p.numero === 'RASCUNHO' ? (
-                            <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">
-                              RASCUNHO
-                            </span>
-                          ) : (
-                            p.numero
-                          )}""", """{numeroSistema === 'RASCUNHO' ? (
-                            <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">RASCUNHO</span>
-                          ) : (
-                            <span className=\"text-xs font-mono font-black text-indigo-700\">{numeroSistema}</span>
-                          )}""", 1)
-          s = s.replace("""{p.numero === 'RASCUNHO' ? (
-                                <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">
-                                  RASCUNHO
-                                </span>
-                              ) : (
-                                p.numero
-                              )}""", """{numeroSistema === 'RASCUNHO' ? (
-                                <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">RASCUNHO</span>
-                              ) : (
-                                <span className=\"text-xs font-mono font-black text-indigo-700\">{numeroSistema}</span>
-                              )}""", 1)
-          lista.write_text(s)
+          p = Path('src/components/PedidosList.tsx')
+          s = p.read_text()
+          s = s.replace("p.numero === 'RASCUNHO'", "numeroSistema === 'RASCUNHO'")
+          s = s.replace("                            p.numero\n", "                            numeroSistema\n")
+          s = s.replace("                                p.numero\n", "                                numeroSistema\n")
+          p.write_text(s)
           PY
-      - name: Commitar correcoes
+      - name: Salvar
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/components/PedidoForm.tsx src/components/PedidosList.tsx
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Corrige situacao comercial e identificacao do pedido"
+          git add src/components/PedidosList.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Ajusta numero do pedido na listagem"
           git push origin HEAD:corrige-numero-e-status-edicao
