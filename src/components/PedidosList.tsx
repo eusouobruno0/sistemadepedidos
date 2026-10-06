@@ -453,12 +453,12 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                           onClick={() => onVisualizar(p)}
                           className="font-mono font-black text-base text-indigo-700 hover:text-indigo-900 cursor-pointer"
                         >
-                          {p.numero === 'RASCUNHO' ? (
+                          {numeroSistema === 'RASCUNHO' ? (
                             <span className="inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs">
                               RASCUNHO
                             </span>
                           ) : (
-                            p.numero
+                            numeroSistema
                           )}
                         </button>
 
@@ -641,12 +641,12 @@ export const PedidosList: React.FC<PedidosListProps> = ({
                               onClick={() => onVisualizar(p)}
                               className="font-mono font-bold text-indigo-700 hover:text-indigo-900 cursor-pointer text-sm"
                             >
-                              {p.numero === 'RASCUNHO' ? (
+                              {numeroSistema === 'RASCUNHO' ? (
                                 <span className="inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs">
                                   RASCUNHO
                                 </span>
                               ) : (
-                                p.numero
+                                numeroSistema
                               )}
                             </button>
                             <div className="flex items-center gap-1">
