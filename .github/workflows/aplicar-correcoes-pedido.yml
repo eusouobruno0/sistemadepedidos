@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - corrige-numero-e-status-edicao
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -19,71 +22,54 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
           form = Path('src/components/PedidoForm.tsx')
           s = form.read_text()
           antigo = "situacaoComercial: pedidoParaEditar?.situacaoComercial || situacaoComercial,"
           novo = "situacaoComercial: situacaoComercial,"
-          if antigo not in s:
-              raise SystemExit('Trecho da situacao comercial nao encontrado')
-          form.write_text(s.replace(antigo, novo, 1))
+          if antigo in s:
+              form.write_text(s.replace(antigo, novo, 1))
 
           lista = Path('src/components/PedidosList.tsx')
           s = lista.read_text()
-
-          marcador_mobile = "const situacao = p.situacaoComercial || 'Enviado';"
-          insercao_mobile = """const situacao = p.situacaoComercial || 'Enviado';
+          marcador = "const situacao = p.situacaoComercial || 'Enviado';"
+          insercao = """const situacao = p.situacaoComercial || 'Enviado';
                 const numeroSistema =
                   p.numero && p.numero !== 'RASCUNHO'
                     ? p.numero
                     : p.numeroSequencial
                     ? `PED${String(p.numeroSequencial).padStart(6, '0')}`
                     : 'RASCUNHO';"""
-          if s.count(marcador_mobile) < 2:
-              raise SystemExit('Marcadores da lista nao encontrados')
-          s = s.replace(marcador_mobile, insercao_mobile, 1)
-
-          trecho_mobile = """{p.numero === 'RASCUNHO' ? (
+          if 'const numeroSistema =' not in s:
+              s = s.replace(marcador, insercao, 2)
+          s = s.replace("""{p.numero === 'RASCUNHO' ? (
                             <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">
                               RASCUNHO
                             </span>
                           ) : (
                             p.numero
-                          )}"""
-          novo_mobile = """{numeroSistema === 'RASCUNHO' ? (
-                            <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">
-                              RASCUNHO
-                            </span>
+                          )}""", """{numeroSistema === 'RASCUNHO' ? (
+                            <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">RASCUNHO</span>
                           ) : (
                             <span className=\"text-xs font-mono font-black text-indigo-700\">{numeroSistema}</span>
-                          )}"""
-          if trecho_mobile not in s:
-              raise SystemExit('Trecho mobile do documento nao encontrado')
-          s = s.replace(trecho_mobile, novo_mobile, 1)
-
-          s = s.replace(marcador_mobile, insercao_mobile, 1)
-          trecho_desktop = """{p.numero === 'RASCUNHO' ? (
+                          )}""", 1)
+          s = s.replace("""{p.numero === 'RASCUNHO' ? (
                                 <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">
                                   RASCUNHO
                                 </span>
                               ) : (
                                 p.numero
-                              )}"""
-          novo_desktop = """{numeroSistema === 'RASCUNHO' ? (
-                                <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">
-                                  RASCUNHO
-                                </span>
+                              )}""", """{numeroSistema === 'RASCUNHO' ? (
+                                <span className=\"inline-block bg-amber-100 text-amber-900 font-sans font-bold px-2 py-0.5 rounded text-xs\">RASCUNHO</span>
                               ) : (
                                 <span className=\"text-xs font-mono font-black text-indigo-700\">{numeroSistema}</span>
-                              )}"""
-          if trecho_desktop not in s:
-              raise SystemExit('Trecho desktop do documento nao encontrado')
-          lista.write_text(s.replace(trecho_desktop, novo_desktop, 1))
+                              )}""", 1)
+          lista.write_text(s)
           PY
       - name: Commitar correcoes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/components/PedidoForm.tsx src/components/PedidosList.tsx
+          if git diff --cached --quiet; then exit 0; fi
           git commit -m "Corrige situacao comercial e identificacao do pedido"
           git push origin HEAD:corrige-numero-e-status-edicao
