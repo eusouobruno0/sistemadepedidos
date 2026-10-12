@@ -11,6 +11,8 @@ interface NavbarProps {
   pedidosCount: number;
 }
 
+const LOGO_DCT = 'https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/1.png';
+
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   onSelectTab,
@@ -28,7 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="text-xl font-black text-slate-900 hover:opacity-85 transition-opacity cursor-pointer tracking-tight"
             >
               <span className="inline-flex items-center gap-2 sm:gap-2.5">
-                <img src="/1.png" alt="DCT FIXAÇÕES" className="h-8 sm:h-9 w-auto object-contain" />
+                <img src={LOGO_DCT} alt="DCT FIXAÇÕES" className="h-8 sm:h-9 w-auto object-contain" />
                 <span>Gestão de Pedidos</span>
               </span>
             </button>
@@ -95,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="text-base font-black text-slate-900 tracking-tight"
             >
               <span className="inline-flex items-center gap-2 sm:gap-2.5">
-                <img src="/1.png" alt="DCT FIXAÇÕES" className="h-8 sm:h-9 w-auto object-contain" />
+                <img src={LOGO_DCT} alt="DCT FIXAÇÕES" className="h-8 sm:h-9 w-auto object-contain" />
                 <span>Gestão de Pedidos</span>
               </span>
             </button>
