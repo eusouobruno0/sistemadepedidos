@@ -20,6 +20,8 @@ import {
   formatPhone,
 } from '../utils/formatters';
 
+const LOGO_DCT_URL = 'https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/1.png';
+
 interface PedidoPrintViewProps {
   pedido: Pedido;
   onBack: () => void;
@@ -72,10 +74,21 @@ body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !
     janela.document.close();
 
     janela.onload = () => {
-      setTimeout(() => {
-        janela.focus();
-        janela.print();
-      }, 350);
+      const imagens = Array.from(janela.document.images);
+      const aguardarImagens = imagens.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+      });
+
+      Promise.all(aguardarImagens).then(() => {
+        setTimeout(() => {
+          janela.focus();
+          janela.print();
+        }, 200);
+      });
     };
   };
 
@@ -114,381 +127,113 @@ ${pedido.observacoes || ''}`;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Barra de Ações Superior (Oculta na Impressão) */}
       <div className="no-print bg-white rounded-2xl border-2 border-slate-300 p-4 sm:p-5 shadow-xs flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center justify-center gap-2 text-base font-bold text-slate-700 hover:text-slate-900 px-5 py-3 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer border border-slate-300 min-h-[44px]"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Voltar para Pedidos</span>
+          <button type="button" onClick={onBack} className="inline-flex items-center justify-center gap-2 text-base font-bold text-slate-700 hover:text-slate-900 px-5 py-3 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer border border-slate-300 min-h-[44px]">
+            <ArrowLeft className="w-5 h-5" /><span>Voltar para Pedidos</span>
           </button>
-
-          {/* BOTÃO PRINCIPAL DE DESTAQUE: IMPRIMIR */}
-          <button
-            type="button"
-            id="btn-imprimir-principal"
-            onClick={handleImprimir}
-            className="inline-flex items-center justify-center gap-2.5 px-7 sm:px-9 py-3 text-base font-black text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl shadow-md shadow-indigo-700/20 transition-all cursor-pointer min-h-[48px]"
-          >
-            <Download className="w-5 h-5 text-indigo-100" />
-            <span>IMPRIMIR / SALVAR PDF</span>
+          <button type="button" id="btn-imprimir-principal" onClick={handleImprimir} className="inline-flex items-center justify-center gap-2.5 px-7 sm:px-9 py-3 text-base font-black text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl shadow-md shadow-indigo-700/20 transition-all cursor-pointer min-h-[48px]">
+            <Download className="w-5 h-5 text-indigo-100" /><span>IMPRIMIR / SALVAR PDF</span>
           </button>
         </div>
-
-        {/* Linha secundária de ações rápidas */}
         <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 pt-2 border-t border-slate-200">
-          <button
-            type="button"
-            onClick={() => onEdit(pedido)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors cursor-pointer min-h-[40px]"
-          >
-            <Edit3 className="w-4 h-4 text-slate-600" />
-            <span>Editar</span>
+          <button type="button" onClick={() => onEdit(pedido)} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors cursor-pointer min-h-[40px]">
+            <Edit3 className="w-4 h-4 text-slate-600" /><span>Editar</span>
           </button>
-
           {onDuplicar && (
-            <button
-              type="button"
-              id="btn-duplicar-pedido-print"
-              onClick={() => onDuplicar(pedido)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-colors cursor-pointer min-h-[40px]"
-              title="Criar cópia deste pedido com o próximo número sequencial oficial"
-            >
-              <Copy className="w-4 h-4 text-purple-600" />
-              <span>Duplicar Pedido</span>
+            <button type="button" id="btn-duplicar-pedido-print" onClick={() => onDuplicar(pedido)} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-colors cursor-pointer min-h-[40px]" title="Criar cópia deste pedido com o próximo número sequencial oficial">
+              <Copy className="w-4 h-4 text-purple-600" /><span>Duplicar Pedido</span>
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={handleCopiarTexto}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors cursor-pointer min-h-[40px]"
-          >
-            {copiado ? (
-              <Check className="w-4 h-4 text-emerald-600" />
-            ) : (
-              <Copy className="w-4 h-4 text-slate-600" />
-            )}
+          <button type="button" onClick={handleCopiarTexto} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors cursor-pointer min-h-[40px]">
+            {copiado ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
             <span>{copiado ? 'Copiado!' : 'Copiar resumo'}</span>
           </button>
-
-
         </div>
       </div>
 
-      {/* Aviso informativo em telas menores */}
       <div className="no-print block sm:hidden text-center text-xs text-slate-500 font-medium bg-slate-100 py-2 px-3 rounded-lg border border-slate-200">
         ↔ Deslize para os lados para visualizar a folha completa. O documento é formatado em página A4. Toque em IMPRIMIR / SALVAR PDF para gerar o PDF mantendo o mesmo layout.
       </div>
 
-      {/* DOCUMENTO OFICIAL A4 (Réplica fiel da folha impressa com scroll horizontal no celular) */}
       <div className="overflow-x-auto pb-6 -mx-3 sm:mx-0 px-3 sm:px-0">
-        <div
-          ref={documentoRef}
-          id="documento-impresso"
-          className="print-container bg-white rounded-xl shadow-md border border-slate-300 min-w-[680px] max-w-[210mm] mx-auto p-6 sm:p-8 font-sans text-slate-900"
-        >
-        {/* Topo: logo DCT + Página */}
-        <div className="flex items-start justify-between gap-4 mb-2">
-          <img
-            src="https://raw.githubusercontent.com/eusouobruno0/sistemadepedidos/main/Logo%20DCT%20Representa%C3%A7%C3%B5es.png"
-            alt="DCT FIXAÇÕES"
-            className="h-14 w-auto object-contain object-left"
-          />
-          <div className="text-right text-[10px] text-slate-500 font-mono pt-1">
-            Página 1 de 1
+        <div ref={documentoRef} id="documento-impresso" className="print-container bg-white rounded-xl shadow-md border border-slate-300 min-w-[680px] max-w-[210mm] mx-auto p-6 sm:p-8 font-sans text-slate-900">
+          <div className="flex items-start justify-between gap-4 mb-2">
+            <img src={LOGO_DCT_URL} alt="DCT FIXAÇÕES" className="h-14 w-auto object-contain object-left" />
+            <div className="text-right text-[10px] text-slate-500 font-mono pt-1">Página 1 de 1</div>
           </div>
-        </div>
 
-        {/* TÍTULO PRINCIPAL */}
-        <div className="text-center font-bold text-lg text-black tracking-wide pb-2">
-          {pedido.tipo === 'ORCAMENTO' ? 'Orçamento' : 'Pedido de Venda'}
-        </div>
+          <div className="text-center font-bold text-lg text-black tracking-wide pb-2">{pedido.tipo === 'ORCAMENTO' ? 'Orçamento' : 'Pedido de Venda'}</div>
 
-        {/* CABEÇALHO: EMPRESA vs NÚMERO DO PEDIDO */}
-        <div className="flex justify-between items-start gap-4 pb-3">
-          {/* Dados da Empresa Emissora */}
-          <div className="text-[11px] leading-tight space-y-0.5 flex-1">
-            <div>
-              <span className="font-bold">Empresa:</span>{' '}
-              <span className="font-bold">{pedido.empresaEmissora.nome}</span>
+          <div className="flex justify-between items-start gap-4 pb-3">
+            <div className="text-[11px] leading-tight space-y-0.5 flex-1">
+              <div><span className="font-bold">Empresa:</span>{' '}<span className="font-bold">{pedido.empresaEmissora.nome}</span></div>
+              <div><span className="font-bold">Endereço:</span> {pedido.empresaEmissora.endereco}</div>
+              <div className="flex gap-4"><div><span className="font-bold">Cidade:</span> {pedido.empresaEmissora.cidade} - {pedido.empresaEmissora.estado}</div></div>
+              <div><span className="font-bold">Bairro:</span> {pedido.empresaEmissora.bairro}</div>
             </div>
-            <div>
-              <span className="font-bold">Endereço:</span> {pedido.empresaEmissora.endereco}
+            <div className="text-[11px] leading-tight space-y-0.5 w-44">
+              <div><span className="font-bold">CNPJ:</span> {pedido.empresaEmissora.cnpj}</div>
+              <div><span className="font-bold">IE:</span> {pedido.empresaEmissora.ie}</div>
+              <div><span className="font-bold">Fone:</span> {pedido.empresaEmissora.telefone}</div>
             </div>
-            <div className="flex gap-4">
-              <div>
-                <span className="font-bold">Cidade:</span> {pedido.empresaEmissora.cidade} -{' '}
-                {pedido.empresaEmissora.estado}
+            <div className="border border-black p-2 min-w-[180px] text-center">
+              <div className="text-[11px] font-bold">Número do Pedido:</div>
+              <div className="text-sm font-bold font-mono tracking-tight mt-0.5">{pedido.numero}</div>
+              {pedido.numeroPedidoIndustria && <div className="text-[10px] text-slate-700 mt-1 font-mono border-t border-slate-300 pt-1"><span className="font-bold">Nº Pedido Indústria:</span> {pedido.numeroPedidoIndustria}</div>}
+              {(pedido.ordemCompraCliente || pedido.numeroPedidoCliente) && <div className="text-[10px] text-slate-700 mt-0.5 font-mono"><span className="font-bold">Ordem de Compra:</span> {pedido.ordemCompraCliente || pedido.numeroPedidoCliente}</div>}
+              <div className="text-[10px] text-slate-700 mt-1 font-bold">
+                <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] ${pedido.situacaoComercial === 'Fechado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{pedido.situacaoComercial === 'Fechado' ? 'PEDIDO FECHADO' : 'PEDIDO ENVIADO'}</span>
               </div>
-            </div>
-            <div>
-              <span className="font-bold">Bairro:</span> {pedido.empresaEmissora.bairro}
-            </div>
-          </div>
-
-          {/* Dados fiscais no meio */}
-          <div className="text-[11px] leading-tight space-y-0.5 w-44">
-            <div>
-              <span className="font-bold">CNPJ:</span> {pedido.empresaEmissora.cnpj}
-            </div>
-            <div>
-              <span className="font-bold">IE:</span> {pedido.empresaEmissora.ie}
-            </div>
-            <div>
-              <span className="font-bold">Fone:</span> {pedido.empresaEmissora.telefone}
+              <div className="text-[10px] text-slate-600 mt-1">Cadastrado em:</div>
+              <div className="text-[10px] font-mono">{formatDateTimeBR(pedido.dataCadastro)}</div>
             </div>
           </div>
 
-          {/* Quadro Número do Pedido (Exato como no PDF) */}
-          <div className="border border-black p-2 min-w-[180px] text-center">
-            <div className="text-[11px] font-bold">Número do Pedido:</div>
-            <div className="text-sm font-bold font-mono tracking-tight mt-0.5">{pedido.numero}</div>
-            {pedido.numeroPedidoIndustria && (
-              <div className="text-[10px] text-slate-700 mt-1 font-mono border-t border-slate-300 pt-1">
-                <span className="font-bold">Nº Pedido Indústria:</span> {pedido.numeroPedidoIndustria}
-              </div>
-            )}
-            {(pedido.ordemCompraCliente || pedido.numeroPedidoCliente) && (
-              <div className="text-[10px] text-slate-700 mt-0.5 font-mono">
-                <span className="font-bold">Ordem de Compra:</span> {pedido.ordemCompraCliente || pedido.numeroPedidoCliente}
-              </div>
-            )}
-            <div className="text-[10px] text-slate-700 mt-1 font-bold">
-              <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] ${
-                pedido.situacaoComercial === 'Fechado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-              }`}>
-                {pedido.situacaoComercial === 'Fechado' ? 'PEDIDO FECHADO' : 'PEDIDO ENVIADO'}
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-600 mt-1">Cadastrado em:</div>
-            <div className="text-[10px] font-mono">{formatDateTimeBR(pedido.dataCadastro)}</div>
+          <div className="border-t-2 border-black my-2"></div>
+          <div className="text-[11px] leading-snug space-y-1 py-1">
+            <div className="grid grid-cols-12 gap-2"><div className="col-span-8"><span className="font-bold">Cliente:</span>{' '}{pedido.cliente.codigo ? `${pedido.cliente.codigo} - ` : ''}{pedido.cliente.razaoSocial}</div><div className="col-span-4"><span className="font-bold">CNPJ/CPF:</span> {pedido.cliente.cnpjCpf}</div></div>
+            <div className="grid grid-cols-12 gap-2"><div className="col-span-8"><span className="font-bold">Telefone:</span> {pedido.cliente.telefone} /</div><div className="col-span-4"><span className="font-bold">Celular:</span> {pedido.cliente.celular || ''}</div></div>
+            <div className="grid grid-cols-12 gap-2"><div className="col-span-8"><span className="font-bold">Endereço:</span> {pedido.cliente.endereco}, {pedido.cliente.numero || ''}</div><div className="col-span-4"><span className="font-bold">Bairro:</span> {pedido.cliente.bairro}</div></div>
+            <div className="grid grid-cols-12 gap-2"><div className="col-span-8"><span className="font-bold">Cidade:</span> {pedido.cliente.cidade}</div><div className="col-span-4"><span className="font-bold">Estado:</span> {pedido.cliente.estado}</div></div>
+            <div className="grid grid-cols-12 gap-2"><div className="col-span-8"><span className="font-bold">Cep:</span> {pedido.cliente.cep}</div><div className="col-span-4"><span className="font-bold">Inscrição Estadual:</span> {pedido.cliente.rgIe || 'ISENTO'}</div></div>
+            <div className="grid grid-cols-12 gap-2"><div className="col-span-12"><span className="font-bold">E-mail:</span> {pedido.cliente.email || '-'}</div></div>
+            <div className="grid grid-cols-12 gap-2"><div className="col-span-12"><span className="font-bold">Local de Entrega:</span>{' '}{pedido.localEntrega || `${pedido.cliente.endereco}, ${pedido.cliente.numero || ''}`}</div></div>
           </div>
+
+          <div className="border-t border-black my-2"></div>
+          <div className="text-[11px] leading-snug space-y-1 py-1">
+            <div className="grid grid-cols-12 gap-2">
+              <div className="col-span-4"><span className="font-bold">Nº Pedido Indústria:</span>{' '}{pedido.numeroPedidoIndustria || '-'}</div>
+              <div className="col-span-4 text-center"><span className="font-bold">Ordem de Compra:</span>{' '}{pedido.ordemCompraCliente || pedido.numeroPedidoCliente || '-'}</div>
+              <div className="col-span-4 text-right"><span className="font-bold">Data Prevista:</span> {formatDateBR(pedido.dataPrevista)}</div>
+            </div>
+            <div className="grid grid-cols-12 gap-2 mt-1"><div className="col-span-8"><span className="font-bold">Transportadora:</span> {pedido.tipoFrete === 'CIF' ? 'CIF' : pedido.transportadora.nome}</div><div className="col-span-4 text-right"><span className="font-bold">Frete:</span>{' '}{pedido.tipoFrete === 'FOB' ? '2 Destinatario (FOB)' : '1 Emitente (CIF)'}</div></div>
+          </div>
+
+          <div className="mt-3 border border-black">
+            <table className="w-full text-left border-collapse text-[10px]">
+              <thead><tr className="border-b border-black font-bold text-center"><th className="border-r border-black p-1 text-center w-20">Código</th><th className="border-r border-black p-1 text-left">Descrição - Ref.(C A)</th><th className="border-r border-black p-1 text-center w-16">Unid.Med.</th><th className="border-r border-black p-1 text-center w-12">Qtd.</th><th className="border-r border-black p-1 text-right w-16">Qtd.Milh</th><th className="border-r border-black p-1 text-right w-16">Pr.Mil.</th><th className="border-r border-black p-1 text-right w-20">Pr.Unit.</th><th className="p-1 text-right w-24">Valor Itens</th></tr></thead>
+              <tbody>{pedido.itens.map((it, i) => (<tr key={i} className="border-b border-black/30 font-mono text-[10px]"><td className="border-r border-black p-1 text-center font-bold">{it.codigoInterno || it.codigo}</td><td className="border-r border-black p-1 font-sans text-left font-semibold">{it.descricao} {it.referencia ? `Ref. ${it.referencia}` : ''}</td><td className="border-r border-black p-1 text-center font-sans font-bold">{it.unidadeMedida}</td><td className="border-r border-black p-1 text-center font-bold">{it.quantidade}</td><td className="border-r border-black p-1 text-right">{it.qtdMilheiro ? formatNumber(it.qtdMilheiro, 3) : '-'}</td><td className="border-r border-black p-1 text-right">{it.precoMilheiro ? formatNumber(it.precoMilheiro, 2) : '-'}</td><td className="border-r border-black p-1 text-right">{formatNumber(it.precoUnitario, 5)}</td><td className="p-1 text-right font-bold">{formatCurrency(it.valorItens, false)}</td></tr>))}</tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 border border-black text-center text-[10px]">
+            <div className="grid grid-cols-6 border-b border-black font-bold"><div className="border-r border-black p-1">Total dos Itens</div><div className="border-r border-black p-1">Frete</div><div className="border-r border-black p-1">Total Acres.</div><div className="border-r border-black p-1">Subs. Trib</div><div className="border-r border-black p-1">Total IPI</div><div className="p-1">Total Pedido</div></div>
+            <div className="grid grid-cols-6 font-mono font-bold text-[11px] p-1"><div className="border-r border-black">{formatCurrency(pedido.totalItens, false)}</div><div className="border-r border-black">{formatCurrency(pedido.frete, false)}</div><div className="border-r border-black">{formatCurrency(pedido.totalAcrescimos, false)}</div><div className="border-r border-black">{formatCurrency(pedido.substituicaoTributaria, false)}</div><div className="border-r border-black">{formatCurrency(pedido.totalIpi, false)}</div><div>{formatCurrency(pedido.totalPedido, false)}</div></div>
+          </div>
+
+          <div className="mt-4 text-[11px] leading-normal space-y-1.5">
+            <div><span className="font-bold">Vendedor:</span> {pedido.vendedor.nome}</div>
+            <div><span className="font-bold">Cond. Pagto:</span> {pedido.condicaoPagamento}</div>
+            <div className="text-base font-bold font-mono pt-1">{formatCurrency(pedido.totalPedido, false)}</div>
+            <div className="flex items-center gap-2 pt-1"><span className="border border-black px-2 py-0.5 font-bold text-[10px]">Programado:</span><span className="font-mono font-bold text-[11px]">{pedido.programado ? pedido.dataProgramada || 'SIM' : '00/00/00'}</span></div>
+            <div><span className="font-bold">Peso:</span> {formatNumber(pedido.pesoTotalKg, 5)} Kg</div>
+            <div className="pt-2"><span className="font-bold">Observação:</span><div className="whitespace-pre-line font-bold text-[10px] mt-0.5 text-black">{pedido.observacoes}</div></div>
+            <div className="pt-8 flex justify-end text-[11px]"><div><span className="font-bold">Conferente:</span>{' '}<span className="border-b border-black inline-block min-w-[280px]">&nbsp;{pedido.conferente || ''}</span></div></div>
+          </div>
+          <div className="border-t-2 border-black mt-6"></div>
         </div>
-
-        {/* LINHA DIVISÓRIA SUPERIOR DUPLA OU FORTE */}
-        <div className="border-t-2 border-black my-2"></div>
-
-        {/* DADOS DO CLIENTE */}
-        <div className="text-[11px] leading-snug space-y-1 py-1">
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-8">
-              <span className="font-bold">Cliente:</span>{' '}
-              {pedido.cliente.codigo ? `${pedido.cliente.codigo} - ` : ''}
-              {pedido.cliente.razaoSocial}
-            </div>
-            <div className="col-span-4">
-              <span className="font-bold">CNPJ/CPF:</span> {pedido.cliente.cnpjCpf}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-8">
-              <span className="font-bold">Telefone:</span> {pedido.cliente.telefone} /
-            </div>
-            <div className="col-span-4">
-              <span className="font-bold">Celular:</span> {pedido.cliente.celular || ''}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-8">
-              <span className="font-bold">Endereço:</span> {pedido.cliente.endereco},{' '}
-              {pedido.cliente.numero || ''}
-            </div>
-            <div className="col-span-4">
-              <span className="font-bold">Bairro:</span> {pedido.cliente.bairro}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-8">
-              <span className="font-bold">Cidade:</span> {pedido.cliente.cidade}
-            </div>
-            <div className="col-span-4">
-              <span className="font-bold">Estado:</span> {pedido.cliente.estado}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-8">
-              <span className="font-bold">Cep:</span> {pedido.cliente.cep}
-            </div>
-            <div className="col-span-4">
-              <span className="font-bold">Inscrição Estadual:</span> {pedido.cliente.rgIe || 'ISENTO'}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-12">
-              <span className="font-bold">E-mail:</span> {pedido.cliente.email || '-'}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-12">
-              <span className="font-bold">Local de Entrega:</span>{' '}
-              {pedido.localEntrega || `${pedido.cliente.endereco}, ${pedido.cliente.numero || ''}`}
-            </div>
-          </div>
-        </div>
-
-        {/* LINHA DIVISÓRIA */}
-        <div className="border-t border-black my-2"></div>
-
-        {/* INFORMAÇÕES DE FATURAMENTO / PAGAMENTO / PRAZO */}
-        <div className="text-[11px] leading-snug space-y-1 py-1">
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-4">
-              <span className="font-bold">Nº Pedido Indústria:</span>{' '}
-              {pedido.numeroPedidoIndustria || '-'}
-            </div>
-            <div className="col-span-4 text-center">
-              <span className="font-bold">Ordem de Compra:</span>{' '}
-              {pedido.ordemCompraCliente || pedido.numeroPedidoCliente || '-'}
-            </div>
-            <div className="col-span-4 text-right">
-              <span className="font-bold">Data Prevista:</span> {formatDateBR(pedido.dataPrevista)}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-12 gap-2 mt-1">
-            <div className="col-span-8">
-              <span className="font-bold">Transportadora:</span> {pedido.tipoFrete === 'CIF' ? 'CIF' : pedido.transportadora.nome}
-            </div>
-            <div className="col-span-4 text-right">
-              <span className="font-bold">Frete:</span>{' '}
-              {pedido.tipoFrete === 'FOB' ? '2 Destinatario (FOB)' : '1 Emitente (CIF)'}
-            </div>
-          </div>
-        </div>
-
-        {/* TABELA DE ITENS (Exata como no documento) */}
-        <div className="mt-3 border border-black">
-          <table className="w-full text-left border-collapse text-[10px]">
-            <thead>
-              <tr className="border-b border-black font-bold text-center">
-                <th className="border-r border-black p-1 text-center w-20">Código</th>
-                <th className="border-r border-black p-1 text-left">Descrição - Ref.(C A)</th>
-                <th className="border-r border-black p-1 text-center w-16">Unid.Med.</th>
-                <th className="border-r border-black p-1 text-center w-12">Qtd.</th>
-                <th className="border-r border-black p-1 text-right w-16">Qtd.Milh</th>
-                <th className="border-r border-black p-1 text-right w-16">Pr.Mil.</th>
-                <th className="border-r border-black p-1 text-right w-20">Pr.Unit.</th>
-                <th className="p-1 text-right w-24">Valor Itens</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pedido.itens.map((it, i) => (
-                <tr key={i} className="border-b border-black/30 font-mono text-[10px]">
-                  <td className="border-r border-black p-1 text-center font-bold">
-                    {it.codigoInterno || it.codigo}
-                  </td>
-                  <td className="border-r border-black p-1 font-sans text-left font-semibold">
-                    {it.descricao} {it.referencia ? `Ref. ${it.referencia}` : ''}
-                  </td>
-                  <td className="border-r border-black p-1 text-center font-sans font-bold">
-                    {it.unidadeMedida}
-                  </td>
-                  <td className="border-r border-black p-1 text-center font-bold">
-                    {it.quantidade}
-                  </td>
-                  <td className="border-r border-black p-1 text-right">
-                    {it.qtdMilheiro ? formatNumber(it.qtdMilheiro, 3) : '-'}
-                  </td>
-                  <td className="border-r border-black p-1 text-right">
-                    {it.precoMilheiro ? formatNumber(it.precoMilheiro, 2) : '-'}
-                  </td>
-                  <td className="border-r border-black p-1 text-right">
-                    {formatNumber(it.precoUnitario, 5)}
-                  </td>
-                  <td className="p-1 text-right font-bold">
-                    {formatCurrency(it.valorItens, false)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* QUADRO DE TOTAIS (Bordas pretas idênticas ao modelo) */}
-        <div className="mt-4 border border-black text-center text-[10px]">
-          <div className="grid grid-cols-6 border-b border-black font-bold">
-            <div className="border-r border-black p-1">Total dos Itens</div>
-            <div className="border-r border-black p-1">Frete</div>
-            <div className="border-r border-black p-1">Total Acres.</div>
-            <div className="border-r border-black p-1">Subs. Trib</div>
-            <div className="border-r border-black p-1">Total IPI</div>
-            <div className="p-1">Total Pedido</div>
-          </div>
-          <div className="grid grid-cols-6 font-mono font-bold text-[11px] p-1">
-            <div className="border-r border-black">{formatCurrency(pedido.totalItens, false)}</div>
-            <div className="border-r border-black">{formatCurrency(pedido.frete, false)}</div>
-            <div className="border-r border-black">
-              {formatCurrency(pedido.totalAcrescimos, false)}
-            </div>
-            <div className="border-r border-black">
-              {formatCurrency(pedido.substituicaoTributaria, false)}
-            </div>
-            <div className="border-r border-black">{formatCurrency(pedido.totalIpi, false)}</div>
-            <div>{formatCurrency(pedido.totalPedido, false)}</div>
-          </div>
-        </div>
-
-        {/* INFORMAÇÕES DE FECHAMENTO (Vendedor, Condição, Total, Programado, Peso, Observações) */}
-        <div className="mt-4 text-[11px] leading-normal space-y-1.5">
-          <div>
-            <span className="font-bold">Vendedor:</span> {pedido.vendedor.nome}
-          </div>
-          <div>
-            <span className="font-bold">Cond. Pagto:</span> {pedido.condicaoPagamento}
-          </div>
-
-          {/* TOTAL DESTACADO */}
-          <div className="text-base font-bold font-mono pt-1">
-            {formatCurrency(pedido.totalPedido, false)}
-          </div>
-
-          {/* PROGRAMADO BOX */}
-          <div className="flex items-center gap-2 pt-1">
-            <span className="border border-black px-2 py-0.5 font-bold text-[10px]">
-              Programado:
-            </span>
-            <span className="font-mono font-bold text-[11px]">
-              {pedido.programado ? pedido.dataProgramada || 'SIM' : '00/00/00'}
-            </span>
-          </div>
-
-          {/* PESO */}
-          <div>
-            <span className="font-bold">Peso:</span> {formatNumber(pedido.pesoTotalKg, 5)} Kg
-          </div>
-
-          {/* OBSERVAÇÃO */}
-          <div className="pt-2">
-            <span className="font-bold">Observação:</span>
-            <div className="whitespace-pre-line font-bold text-[10px] mt-0.5 text-black">
-              {pedido.observacoes}
-            </div>
-          </div>
-
-          {/* LINHA DE ASSINATURA CONFERENTE */}
-          <div className="pt-8 flex justify-end text-[11px]">
-            <div>
-              <span className="font-bold">Conferente:</span>{' '}
-              <span className="border-b border-black inline-block min-w-[280px]">
-                &nbsp;{pedido.conferente || ''}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* LINHA FINAL INFERIOR */}
-        <div className="border-t-2 border-black mt-6"></div>
-      </div>
       </div>
     </div>
   );
