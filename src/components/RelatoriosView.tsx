@@ -56,8 +56,16 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   );
 
   // Filtros de análise
-  const [dataInicio, setDataInicio] = useState<string>('');
-  const [dataFim, setDataFim] = useState<string>('');
+  // O mês atual é o período padrão; períodos anteriores permanecem disponíveis nos filtros.
+  const periodoMesAtual = () => {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const ultimoDia = String(new Date(ano, hoje.getMonth() + 1, 0).getDate()).padStart(2, '0');
+    return { inicio: `${ano}-${mes}-01`, fim: `${ano}-${mes}-${ultimoDia}` };
+  };
+  const [dataInicio, setDataInicio] = useState<string>(() => periodoMesAtual().inicio);
+  const [dataFim, setDataFim] = useState<string>(() => periodoMesAtual().fim);
   const [filtroVendedor, setFiltroVendedor] = useState<string>('TODOS');
   const [filtroRepresentada, setFiltroRepresentada] = useState<string>('TODOS');
   const [filtroCondicao, setFiltroCondicao] = useState<string>('TODOS');
@@ -578,7 +586,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   </select>
                 </div>
               </div>
-              <button type="button" onClick={() => { setDataInicio(''); setDataFim(''); setFiltroVendedor('TODOS'); }} className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50">Limpar filtros</button>
+              <button type="button" onClick={() => { setDataInicio(periodoMesAtual().inicio); setDataFim(periodoMesAtual().fim); setFiltroVendedor('TODOS'); }} className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50">Limpar filtros</button>
             </div>
           </div>
 
