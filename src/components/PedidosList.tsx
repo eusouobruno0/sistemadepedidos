@@ -117,8 +117,14 @@ export const PedidosList: React.FC<PedidosListProps> = ({
 
   // Resumo analítico com segregação comercial de Enviados x Fechados (somente para pedidos ativos)
   const resumo = useMemo(() => {
+    // Apenas o resumo mensal é limitado; a listagem e o histórico continuam completos.
+    const hoje = new Date();
+    const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
     const pedidosFechados = pedidos.filter(
-      (p) => p.situacaoComercial === 'Fechado' && p.status !== 'Cancelado'
+      (p) =>
+        p.situacaoComercial === 'Fechado' &&
+        p.status !== 'Cancelado' &&
+        p.dataCadastro?.slice(0, 7) === mesAtual
     );
     const totalFechado = pedidosFechados.reduce((acc, p) => acc + (p.totalPedido || 0), 0);
 
@@ -175,7 +181,7 @@ export const PedidosList: React.FC<PedidosListProps> = ({
               {formatCurrency(resumo.totalFechado)}
             </div>
             <div className="mt-1 text-2xs text-emerald-700 font-semibold">
-              Critério oficial: Fechado (Venda Efetiva)
+              Somente pedidos fechados cadastrados neste mês · histórico preservado
             </div>
           </div>
 
